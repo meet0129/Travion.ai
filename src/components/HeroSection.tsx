@@ -72,13 +72,14 @@ const HeroSection = () => {
             placeholder="Simply describe your trip..."
             value={tripDescription}
             onChange={(e) => setTripDescription(e.target.value)}
-            className="w-full px-6 py-4 text-lg rounded-2xl border-2 border-border focus:border-primary pr-16 transition-all duration-300 focus:shadow-lg focus:shadow-primary/10"
+            className="w-full px-6 py-4 text-lg rounded-2xl border-2 border-border focus:border-primary pr-20 transition-all duration-300 focus:shadow-lg focus:shadow-primary/10 hover:shadow-md"
             onKeyPress={(e) => e.key === "Enter" && handleSubmit()}
           />
           <Button
             onClick={handleSubmit}
-            size="sm"
-            className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-muted hover:bg-muted/80 text-muted-foreground rounded-xl px-4 hover:scale-105 transition-all duration-200"
+            size="sm" 
+            disabled={!tripDescription.trim()}
+            className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-primary hover:bg-primary-dark text-primary-foreground rounded-xl px-4 hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
           >
             Submit
             <ArrowRight className="w-4 h-4 ml-2" />
