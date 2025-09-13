@@ -19,17 +19,17 @@ const Sidebar = () => {
 
   return (
     <>
-      {/* Collapse Button */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className={`fixed top-4 z-50 hover:scale-110 transition-all duration-300 hover:bg-primary/10 ${
-          isCollapsed ? 'left-4' : 'left-60'
-        }`}
-        onClick={() => setIsCollapsed(!isCollapsed)}
-      >
-        <ChevronLeft className={`w-4 h-4 transition-transform duration-300 ${isCollapsed ? 'rotate-180' : ''}`} />
-      </Button>
+      {/* Collapse Button - Only show when sidebar is collapsed */}
+      {isCollapsed && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="fixed top-4 left-4 z-50 hover:scale-110 transition-all duration-300 hover:bg-primary/10"
+          onClick={() => setIsCollapsed(!isCollapsed)}
+        >
+          <ChevronLeft className="w-4 h-4 transition-transform duration-300 rotate-180" />
+        </Button>
+      )}
 
       {/* Sidebar */}
       <div className={`fixed left-0 top-0 h-full bg-background/95 backdrop-blur-md border-r border-border z-40 transition-all duration-500 ease-in-out shadow-2xl w-64 ${
