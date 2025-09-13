@@ -28,6 +28,50 @@ const HeroSection = () => {
       {/* Background Graphics */}
       <div className="absolute inset-0 opacity-5 bg-[url('/src/assets/travel-background.svg')] bg-cover bg-center -z-10" />
       
+      {/* Travel Icons Background */}
+      <div className="absolute inset-0 -z-10 overflow-hidden">
+        {/* Floating Travel Icons */}
+        <div className="absolute top-10 left-10 opacity-10 animate-bounce" style={{ animationDelay: '0s', animationDuration: '3s' }}>
+          <span className="text-4xl">✈️</span>
+        </div>
+        <div className="absolute top-20 right-16 opacity-10 animate-bounce" style={{ animationDelay: '1s', animationDuration: '4s' }}>
+          <span className="text-3xl">🏔️</span>
+        </div>
+        <div className="absolute top-32 left-20 opacity-10 animate-bounce" style={{ animationDelay: '2s', animationDuration: '3.5s' }}>
+          <span className="text-2xl">🏖️</span>
+        </div>
+        <div className="absolute top-40 right-24 opacity-10 animate-bounce" style={{ animationDelay: '0.5s', animationDuration: '4.5s' }}>
+          <span className="text-3xl">🏛️</span>
+        </div>
+        
+        {/* Bottom section icons */}
+        <div className="absolute bottom-20 left-16 opacity-10 animate-bounce" style={{ animationDelay: '1.5s', animationDuration: '3.8s' }}>
+          <span className="text-2xl">🌴</span>
+        </div>
+        <div className="absolute bottom-32 right-12 opacity-10 animate-bounce" style={{ animationDelay: '2.5s', animationDuration: '4.2s' }}>
+          <span className="text-3xl">🚗</span>
+        </div>
+        <div className="absolute bottom-40 left-24 opacity-10 animate-bounce" style={{ animationDelay: '0.8s', animationDuration: '3.2s' }}>
+          <span className="text-2xl">🎒</span>
+        </div>
+        
+        {/* Center area icons */}
+        <div className="absolute top-1/2 left-8 opacity-10 animate-bounce" style={{ animationDelay: '1.2s', animationDuration: '4.8s' }}>
+          <span className="text-2xl">🗺️</span>
+        </div>
+        <div className="absolute top-1/2 right-8 opacity-10 animate-bounce" style={{ animationDelay: '2.8s', animationDuration: '3.6s' }}>
+          <span className="text-2xl">📸</span>
+        </div>
+        
+        {/* Additional decorative elements */}
+        <div className="absolute top-16 left-1/2 transform -translate-x-1/2 opacity-5">
+          <div className="w-32 h-32 border border-primary/20 rounded-full"></div>
+        </div>
+        <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 opacity-5">
+          <div className="w-24 h-24 border border-primary/20 rounded-full"></div>
+        </div>
+      </div>
+      
       {/* Brand and Tagline */}
       <div className="text-center mb-6 lg:mb-8 animate-fade-in">
         <div className="flex items-center justify-center gap-2 mb-4">
@@ -47,7 +91,7 @@ const HeroSection = () => {
       </div>
 
       {/* Action Buttons */}
-      <div className="flex flex-col sm:flex-row items-center gap-3 lg:gap-4 mb-6 lg:mb-8 animate-scale-in w-full max-w-md sm:max-w-none">
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-3 lg:gap-4 mb-6 lg:mb-8 w-full">
         <Button 
           size="lg" 
           className="bg-primary hover:bg-primary-dark text-primary-foreground px-6 lg:px-8 py-3 rounded-full font-medium hover:scale-105 transition-all duration-300 hover:shadow-lg hover:shadow-primary/25 w-full sm:w-auto touch-manipulation"
