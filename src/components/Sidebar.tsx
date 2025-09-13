@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ArrowLeft, Home, MessageCircle, Heart, MapPin, Briefcase } from "lucide-react";
+import { ChevronLeft, Home, MessageCircle, Heart, MapPin, Briefcase } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import UserProfile from "@/components/UserProfile";
 import { useNavigate } from "react-router-dom";
@@ -19,17 +19,17 @@ const Sidebar = () => {
 
   return (
     <>
-      {/* Collapse Button */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className={`fixed top-4 z-50 hover:scale-110 transition-all duration-300 hover:bg-primary/10 ${
-          isCollapsed ? 'left-4' : 'left-60'
-        }`}
-        onClick={() => setIsCollapsed(!isCollapsed)}
-      >
-        <ChevronLeft className={`w-4 h-4 transition-transform duration-300 ${isCollapsed ? 'rotate-180' : ''}`} />
-      </Button>
+      {/* Collapse Button - Only show when sidebar is collapsed */}
+      {isCollapsed && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="fixed top-4 left-4 z-50 hover:scale-110 transition-all duration-300 hover:bg-primary/10"
+          onClick={() => setIsCollapsed(!isCollapsed)}
+        >
+          <ChevronLeft className="w-4 h-4 transition-transform duration-300 rotate-180" />
+        </Button>
+      )}
 
       {/* Sidebar */}
       <div className={`fixed left-0 top-0 h-full bg-background/95 backdrop-blur-md border-r border-border z-40 transition-all duration-500 ease-in-out shadow-2xl w-64 ${
@@ -39,7 +39,7 @@ const Sidebar = () => {
         {/* Header with Brand */}
         <div className="p-4 border-b border-border/50 bg-gradient-to-r from-primary/5 to-transparent">
           <div className="flex items-center gap-2 mb-4 group">
-            <ArrowLeft 
+            <ChevronLeft 
               className="w-5 h-5 text-muted-foreground cursor-pointer hover:text-primary transition-all duration-200 group-hover:scale-110" 
               onClick={() => setIsCollapsed(true)}
             />
