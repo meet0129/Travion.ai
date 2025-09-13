@@ -45,13 +45,13 @@ const PopularTrips = () => {
   ];
 
   return (
-    <div className="px-4 py-16 max-w-7xl mx-auto">
-      <div className="text-center mb-12">
-        <h2 className="text-3xl font-bold text-foreground mb-4">Popular Trips</h2>
-        <p className="text-muted-foreground text-lg">Discover India's most loved destinations</p>
+    <div className="px-4 py-8 lg:py-16 max-w-7xl mx-auto">
+      <div className="text-center mb-8 lg:mb-12">
+        <h2 className="text-2xl lg:text-3xl font-bold text-foreground mb-2 lg:mb-4">Popular Trips</h2>
+        <p className="text-muted-foreground text-base lg:text-lg">Discover India's most loved destinations</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
         {trips.map((trip, index) => (
           <TripCard key={index} {...trip} />
         ))}
