@@ -79,7 +79,7 @@ const HeroSection = () => {
             onClick={handleSubmit}
             size="sm" 
             disabled={!tripDescription.trim()}
-            className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-primary hover:bg-primary-dark text-primary-foreground rounded-xl px-4 hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+            className="absolute right-2 top-1/2 transform -translate-y-1/2 rounded-xl px-4 hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
           >
             Submit
             <ArrowRight className="w-4 h-4 ml-2" />
