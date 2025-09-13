@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ArrowLeft, Home, MessageCircle, Heart, MapPin, Briefcase } from "lucide-react";
+import { ChevronLeft, Home, MessageCircle, Heart, MapPin, Briefcase } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import UserProfile from "@/components/UserProfile";
 import { useNavigate } from "react-router-dom";
@@ -39,7 +39,7 @@ const Sidebar = () => {
         {/* Header with Brand */}
         <div className="p-4 border-b border-border/50 bg-gradient-to-r from-primary/5 to-transparent">
           <div className="flex items-center gap-2 mb-4 group">
-            <ArrowLeft 
+            <ChevronLeft 
               className="w-5 h-5 text-muted-foreground cursor-pointer hover:text-primary transition-all duration-200 group-hover:scale-110" 
               onClick={() => setIsCollapsed(true)}
             />
