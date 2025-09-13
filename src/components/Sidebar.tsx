@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, User, Info, MessageSquare, Users, FileText, Shield, Luggage, ArrowLeft } from "lucide-react";
+import { ChevronLeft, User, Info, MessageSquare, Users, FileText, Shield, Briefcase, ArrowLeft } from "lucide-react";
 import { useState } from "react";
 
 const Sidebar = () => {
@@ -46,7 +46,7 @@ const Sidebar = () => {
           {/* My Trips Section - Only show if logged in */}
           {isLoggedIn && (
             <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer">
-              <Luggage className="w-5 h-5 text-muted-foreground" />
+              <Briefcase className="w-5 h-5 text-muted-foreground" />
               <span className="font-medium text-foreground">My trips</span>
             </div>
           )}
