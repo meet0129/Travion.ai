@@ -1,17 +1,20 @@
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, User, Info, MessageSquare, Users, FileText, Shield, Briefcase, ArrowLeft } from "lucide-react";
-import { useState } from "react";
+import { ChevronLeft, ArrowLeft, Home, MessageCircle, Heart, MapPin, Briefcase } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import UserProfile from "@/components/UserProfile";
+import { useNavigate } from "react-router-dom";
 
 const Sidebar = () => {
   const [isCollapsed, setIsCollapsed] = useState(true);
-  const isLoggedIn = false; // TODO: Connect to Supabase for authentication
+  const { currentUser } = useAuth();
+  const navigate = useNavigate();
 
   const menuItems = [
-    { icon: Info, label: "About", active: false },
-    { icon: FileText, label: "Contact", active: false },
-    { icon: Users, label: "Team", active: false },
-    { icon: FileText, label: "Terms", active: false },
-    { icon: Shield, label: "Privacy", active: false },
+    { icon: Home, label: "Home", path: "/" },
+    { icon: MessageCircle, label: "Chat", path: "/chat" },
+    { icon: Heart, label: "Wishlist", path: "/preferences" },
+    { icon: MapPin, label: "Explore", path: "/destinations" },
   ];
 
   return (
@@ -49,7 +52,7 @@ const Sidebar = () => {
           </div>
           
           {/* My Trips Section - Only show if logged in */}
-          {isLoggedIn && (
+          {currentUser && (
             <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-primary/10 transition-all duration-200 cursor-pointer group hover:scale-105">
               <Briefcase className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
               <span className="font-medium text-foreground">My trips</span>
@@ -58,35 +61,53 @@ const Sidebar = () => {
         </div>
 
         {/* Menu Items */}
-        <div className="flex-1 p-4 overflow-y-auto">
-          <nav className="space-y-2">
-            {menuItems.map((item, index) => {
-              const Icon = item.icon;
-              return (
-                <Button
-                  key={index}
-                  variant="ghost"
-                  className={`w-full justify-start gap-3 hover:scale-105 transition-all duration-200 hover:bg-primary/10 group ${
-                    item.active ? 'bg-primary/10 text-primary shadow-md' : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <Icon className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
-                  {item.label}
-                </Button>
-              );
-            })}
-          </nav>
-        </div>
+        <nav className="flex-1 py-4">
+          <div className="space-y-2 px-4">
+            {menuItems.map((item, index) => (
+              <Button
+                key={index}
+                variant="ghost"
+                className="w-full justify-start gap-3 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all duration-200 group"
+                onClick={() => {
+                  navigate(item.path);
+                  setIsCollapsed(true); // Close sidebar on mobile after navigation
+                }}
+              >
+                <item.icon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+                <span className="font-medium">{item.label}</span>
+              </Button>
+            ))}
+          </div>
+        </nav>
 
         {/* Footer */}
         <div className="p-4 border-t border-border/50 mt-auto bg-gradient-to-r from-transparent to-primary/5">
-          {/* Profile Section */}
-          <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-primary/10 transition-all duration-200 cursor-pointer group hover:scale-105">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-r from-primary/20 to-primary/30 flex items-center justify-center group-hover:rotate-12 transition-transform duration-300">
-              <User className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+          {currentUser ? (
+            <UserProfile />
+          ) : (
+            <div className="space-y-2">
+              <Button
+                variant="outline"
+                className="w-full justify-center"
+                onClick={() => {
+                  navigate("/signin");
+                  setIsCollapsed(true);
+                }}
+              >
+                Sign In
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-center text-sm text-muted-foreground"
+                onClick={() => {
+                  navigate("/signup");
+                  setIsCollapsed(true);
+                }}
+              >
+                Create Account
+              </Button>
             </div>
-            <span className="font-medium text-foreground text-sm">My profile</span>
-          </div>
+          )}
         </div>
       </div>
 
