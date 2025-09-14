@@ -47,7 +47,7 @@ const HeroSection = () => {
                 <div className="flex-1 flex items-center gap-3">
                   <input 
                     type="text" 
-                    placeholder="Simply describe your trip... (e.g., 'Plan a 5-day trip to Manali from Ahmedabad in October')"
+                    placeholder="Simply describe your trip..."
                     value={tripDescription}
                     onChange={(e) => setTripDescription(e.target.value)}
                     onKeyPress={handleKeyPress}
@@ -94,7 +94,6 @@ const HeroSection = () => {
                 Explore Preferences
               </Button>
             </div>
-
             <PopularTrips />
           </div>
         </div>
