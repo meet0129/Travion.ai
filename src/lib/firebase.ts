@@ -13,12 +13,13 @@ import { getFirestore } from 'firebase/firestore';
 
 // Firebase configuration - Replace with your actual config
 const firebaseConfig = {
-  apiKey: "your-api-key-here",
-  authDomain: "your-project.firebaseapp.com",
-  projectId: "your-project-id",
-  storageBucket: "your-project.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "your-app-id"
+  apiKey: "AIzaSyCvO2yhUnMFx4IN_lZ5wx5uhh4YU1-EmNI",
+  authDomain: "travion-953d9.firebaseapp.com",
+  projectId: "travion-953d9",
+  storageBucket: "travion-953d9.firebasestorage.app",
+  messagingSenderId: "913506073655",
+  appId: "1:913506073655:web:36f7383c9cc01e0bf853b2",
+  measurementId: "G-S22CVRXVRP"
 };
 
 // Initialize Firebase
