@@ -45,7 +45,7 @@ const PopularTrips = () => {
   ];
 
   return (
-    <div className="px-4 py-8 lg:py-16 max-w-7xl mx-auto">
+    <div className="px-4 py-2 lg:py-4 max-w-7xl mx-auto">
       <div className="text-center mb-8 lg:mb-12">
         <h2 className="text-2xl lg:text-3xl font-bold text-foreground mb-2 lg:mb-4">Popular Trips</h2>
         <p className="text-muted-foreground text-base lg:text-lg">Discover India's most loved destinations</p>
