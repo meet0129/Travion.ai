@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Bot, User as UserIcon, ThumbsUp, ThumbsDown, RotateCcw, Send } from 'lucide-react';
+import userAvatar from '../assets/default-avatar.svg';
 import Sidebar from '../components/Sidebar';
 import { initializeGemini, sendMessageToGemini, geminiService } from '../lib/gemini';
 import PreferencesWidget from '../components/PreferencesWidget';
@@ -75,35 +76,35 @@ const Chat = () => {
   const extractTripInfo = (message, currentContext) => {
     const newContext = { ...currentContext };
     const lowerMessage = message.toLowerCase().trim();
-    
+
     // Extract destination
     const indianDestinations = [
-      'goa', 'kerala', 'rajasthan', 'mumbai', 'delhi', 'bangalore', 'chennai', 
-      'kolkata', 'jaipur', 'udaipur', 'jodhpur', 'agra', 'varanasi', 'rishikesh', 
-      'manali', 'shimla', 'darjeeling', 'ooty', 'kodaikanal', 'munnar', 'alleppey', 
+      'goa', 'kerala', 'rajasthan', 'mumbai', 'delhi', 'bangalore', 'chennai',
+      'kolkata', 'jaipur', 'udaipur', 'jodhpur', 'agra', 'varanasi', 'rishikesh',
+      'manali', 'shimla', 'darjeeling', 'ooty', 'kodaikanal', 'munnar', 'alleppey',
       'kochi', 'mysore', 'hampi'
     ];
-    
+
     for (const dest of indianDestinations) {
       if (lowerMessage.includes(dest)) {
         newContext.destination = dest.charAt(0).toUpperCase() + dest.slice(1);
         break;
       }
     }
-    
+
     // Extract start location
     const indianCities = [
-      'mumbai', 'delhi', 'bangalore', 'chennai', 'kolkata', 'hyderabad', 'pune', 
+      'mumbai', 'delhi', 'bangalore', 'chennai', 'kolkata', 'hyderabad', 'pune',
       'ahmedabad', 'jaipur', 'surat', 'lucknow', 'kochi', 'chandigarh'
     ];
-    
+
     for (const city of indianCities) {
       if (lowerMessage.includes(`from ${city}`)) {
         newContext.startLocation = city.charAt(0).toUpperCase() + city.slice(1);
         break;
       }
     }
-    
+
     // Extract dates and duration
     const dateMatch = message.match(/(\d{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*(?:\s+\d{4})?)/gi);
     if (dateMatch) {
@@ -114,7 +115,7 @@ const Chat = () => {
         }
       }
     }
-    
+
     const durationMatch = message.match(/(\d+)\s*(?:days?|weeks?|months?)/i);
     if (durationMatch) {
       const num = parseInt(durationMatch[1]);
@@ -126,7 +127,7 @@ const Chat = () => {
         newContext.duration = `${num} days`;
       }
     }
-    
+
     // Extract number of travelers
     const travelerMatch = message.match(/(\d+)\s*(?:people|persons?|travelers?|friends?|family\s*members?)/i);
     if (travelerMatch) {
@@ -136,11 +137,12 @@ const Chat = () => {
     } else if (lowerMessage.includes('couple') || lowerMessage.includes('two of us')) {
       newContext.travelers = 2;
     }
-    
+  
     // Persist on every extraction
     try {
       sessionStorage.setItem('tripContext', JSON.stringify(newContext));
     } catch {}
+
     return newContext;
   };
 
@@ -153,7 +155,7 @@ const Chat = () => {
     try {
       // Send message to Gemini and get response
       const aiResponse = await sendMessageToGemini(message, tripContext);
-      
+
       // Extract information from user's message
       const updatedContext = extractTripInfo(message, tripContext);
       setTripContext(updatedContext);
@@ -162,11 +164,12 @@ const Chat = () => {
       if (aiResponse.toLowerCase().includes("let's move on to your travel preferences")) {
         updatedContext.isComplete = true;
         setTripContext(updatedContext);
+       
         try { sessionStorage.setItem('tripContext', JSON.stringify(updatedContext)); } catch {}
         
         setTimeout(() => {
-          setMessages(prev => [...prev, { 
-            type: "ai", 
+          setMessages(prev => [...prev, {
+            type: "ai",
             content: `🎊 Here's your travel plan:
 
 📍 **Destination:** ${updatedContext.destination}
@@ -178,13 +181,13 @@ const Chat = () => {
 Time to personalize your ${updatedContext.destination} experience! 🎯`,
             timestamp: new Date()
           }]);
-          
+
           setTimeout(() => {
             setPreferencesShown(true);
           }, 1500);
         }, 1000);
       }
-      
+
       return aiResponse;
     } catch (error) {
       console.error('Error processing message:', error);
@@ -197,18 +200,18 @@ Time to personalize your ${updatedContext.destination} experience! 🎯`,
 
     const userMessage = { type: "user", content: newMessage, timestamp: new Date() };
     setMessages(prev => [...prev, userMessage]);
-    
+
     const messageContent = newMessage;
     setNewMessage("");
     setIsTyping(true);
     setError(null);
     setHasUserInteracted(true);
-    
+
     try {
       const aiResponse = await processMessage(messageContent);
       setTimeout(() => {
-        setMessages(prev => [...prev, { 
-          type: "ai", 
+        setMessages(prev => [...prev, {
+          type: "ai",
           content: aiResponse,
           timestamp: new Date()
         }]);
@@ -217,10 +220,10 @@ Time to personalize your ${updatedContext.destination} experience! 🎯`,
     } catch (error) {
       console.error('Error sending message:', error);
       setError(error instanceof Error ? error.message : 'An error occurred while processing your message');
-      
+
       setTimeout(() => {
-        setMessages(prev => [...prev, { 
-          type: "ai", 
+        setMessages(prev => [...prev, {
+          type: "ai",
           content: "Oops! Something went wrong on my end. Mind giving that another shot? 🔄",
           timestamp: new Date()
         }]);
@@ -247,13 +250,13 @@ Time to personalize your ${updatedContext.destination} experience! 🎯`,
       travelers: tripContext.travelers,
       preferences: pickedIds
     };
-    
+
     try {
       sessionStorage.setItem('tripData', JSON.stringify(tripData));
     } catch (e) {
       console.log('SessionStorage not available');
     }
-    
+
     setMessages(prev => [...prev, 
       { type: "user", content: "Perfect! I've selected my preferences!", timestamp: new Date() },
       { 
@@ -262,56 +265,64 @@ Time to personalize your ${updatedContext.destination} experience! 🎯`,
         timestamp: new Date() 
       }
     ]);
-    
+
     setTimeout(() => {
       navigate("/destinations");
     }, 2500);
   };
 
   // Dummy data generation now moved into PreferencesWidget
-  
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 font-['Inter',sans-serif]">
-      <div className="w-full max-w-4xl mx-auto px-4 pt-6">
+    <div className="min-h-screen bg-white dark:bg-slate-950 font-['Inter',sans-serif]">
+      <div className="w-full max-w-3xl mx-auto px-4 pt-6">
         <Sidebar />
-        
+
         {error && (
           <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-3 animate-in slide-in-from-top-4 duration-300">
             <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
             <div className="text-red-700 dark:text-red-300 text-sm font-medium">{error}</div>
           </div>
         )}
-        
-        <div className="space-y-6 mb-8">
+
+        <div className="space-y-8 mb-28">
           {messages.map((message, index) => (
             <div
               key={index}
-              className={`flex items-start gap-3 ${
-                message.type === "user" ? "flex-row-reverse" : ""
-              }`}
+              className={`flex items-start gap-3`}
             >
-              <div
-                className={`flex flex-col ${
-                  message.type === "user" ? "items-end" : "items-start"
-                }`}
-              >
-                <div
-                  className={`rounded-lg p-3 ${
-                    message.type === "user"
-                      ? "bg-blue-500 text-white"
-                      : "bg-white dark:bg-slate-800"
-                  }`}
-                >
-                  <div className="prose dark:prose-invert max-w-none">
-                    <div dangerouslySetInnerHTML={{ 
-                      __html: message.content.replace(/\n/g, '<br>') 
-                    }} />
+              {message.type === 'ai' ? (
+                <div className="flex items-start gap-3 max-w-[92%]">
+                  <div className="h-8 w-8 rounded-full bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center flex-shrink-0">
+                    <Bot className="h-4 w-4 text-violet-600 dark:text-violet-300" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-xs font-semibold text-violet-700 dark:text-violet-300 mb-1">Travion.ai</div>
+                    <div className="rounded-none border-0 bg-transparent p-0">
+                      <div className="prose dark:prose-invert max-w-none">
+                        <div dangerouslySetInnerHTML={{ __html: message.content.replace(/\n/g, '<br>') }} />
+                      </div>
+                    </div>
+                    <div className="mt-2 flex items-center gap-3">
+                      <div className="hidden sm:flex items-center gap-1 text-slate-400 dark:text-slate-500">
+                        <button className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800" title="Good response" aria-label="Good response"><ThumbsUp className="h-4 w-4" /></button>
+                        <button className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800" title="Bad response" aria-label="Bad response"><ThumbsDown className="h-4 w-4" /></button>
+                        <button className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800" title="Undo" aria-label="Undo"><RotateCcw className="h-4 w-4" /></button>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <span className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  {message.timestamp.toLocaleTimeString()}
-                </span>
-              </div>
+              ) : (
+                <div className="flex items-start gap-3 max-w-[92%]">
+                  <img src={userAvatar} alt="You" className="h-8 w-8 rounded-full border border-slate-200 dark:border-slate-800 flex-shrink-0" />
+                  <div className="flex-1">
+                    <div className="text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">You</div>
+                    <div className="p-0">
+                      <div className="whitespace-pre-wrap text-slate-900 dark:text-slate-100">{message.content}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
 
@@ -331,7 +342,7 @@ Time to personalize your ${updatedContext.destination} experience! 🎯`,
               </div>
             </div>
           )}
-          
+
           <div ref={messagesEndRef} />
         </div>
 
