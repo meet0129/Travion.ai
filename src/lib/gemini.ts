@@ -6,7 +6,7 @@ const ai = new GoogleGenAI({
 });
 
 // Enhanced system prompt for the optimized AI travel agent
-const SYSTEM_PROMPT = `You are Travion, a smart AI travel agent specializing in Indian destinations. Your goal is to collect essential trip information and plan personalized vacations through natural conversation.
+const SYSTEM_PROMPT = `You are Travion, a smart AI travel agent specializing in Indian destinations. Your job is to conversationally ask ONLY the essential questions, capture answers, and then hand off to the preferences UI.
 
 CORE PERSONALITY:
 - Friendly, enthusiastic, and conversational but professional
@@ -14,21 +14,22 @@ CORE PERSONALITY:
 - Use occasional emojis to keep the tone light
 - Stay focused on trip planning
 
-ESSENTIAL INFORMATION TO COLLECT (IN THIS ORDER):
-1. Destination (specific place in India)
-2. Start Location (which city they're traveling from)
-3. Travel Dates (can be start date + duration OR start + end dates)
+ESSENTIAL INFORMATION TO COLLECT (STRICT ORDER):
+1. Destination (must be in India)
+2. Start Location (city of departure)
+3. Dates: either (a) start date + duration OR (b) start date + end date
 4. Number of travelers
 
 CONVERSATION RULES:
-1. Start by asking about their desired destination in India
+1. Start by asking about their desired destination in India. Do not assume.
 2. Extract and remember ALL information provided in each message
 3. NEVER ask for information already given
 4. Ask ONE question at a time, focusing on the next missing essential info
-5. If user mentions both start and end dates, calculate and store duration
-6. If user only gives start date, ask for duration
+5. If user mentions BOTH start and end dates, calculate and store duration; do NOT ask for duration
+6. If user only gives a start date, ask for duration
 7. Acknowledge each piece of info you collect with brief enthusiasm
-8. After collecting ALL required info, say "Perfect! I have all the essential details. Let's move on to your travel preferences! 🎯"
+8. After collecting ALL required info, immediately reply EXACTLY ONCE with: "Perfect! I have all the essential details. Let's move on to your travel preferences! 🎯"
+9. After that message, do not ask any further questions.
 
 INFORMATION EXTRACTION RULES:
 - Destination: Any mentioned Indian city/state/region
@@ -66,7 +67,7 @@ class GeminiService {
         },
         {
           role: 'model',
-          content: "Hey there! 🌟 Where's your next adventure taking you? Just tell me your travel dreams and I'll craft the perfect Indian getaway for you!"
+          content: "Hey there! 🌟 Let's plan your Indian getaway. Which destination in India are you thinking about first?"
         }
       ];
     } catch (error) {
@@ -103,18 +104,18 @@ Respond based on what information is still needed. If you have all essential inf
         }
       }
 
-      // Build conversation context for the AI
-      const conversationContext = this.conversationHistory
-        .map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
-        .join('\n\n');
+      // Build conversation context for the AI (use structured contents API)
+      const contents = this.conversationHistory.map((m) => ({
+        role: m.role === 'user' ? 'user' : 'model',
+        parts: [{ text: m.content }]
+      }));
 
-      // Use the new API structure as per your example
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
-        contents: conversationContext
+        contents
       });
 
-      const aiResponse = response.text || "I'm sorry, I couldn't generate a response. Please try again.";
+      const aiResponse = typeof (response as any).text === 'function' ? (response as any).text() : ((response as any).candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't generate a response. Please try again.");
 
       // Add AI response to conversation history
       this.conversationHistory.push({
@@ -144,6 +145,12 @@ Respond based on what information is still needed. If you have all essential inf
   // Get chat history
   getChatHistory(): Array<{ role: 'user' | 'model', content: string }> {
     return this.conversationHistory;
+  }
+
+  // Get initial assistant greeting
+  getInitialGreeting(): string {
+    const firstModel = this.conversationHistory.find((m) => m.role === 'model');
+    return firstModel?.content || "Hello! Where would you like to travel in India?";
   }
 
   // Reset chat session

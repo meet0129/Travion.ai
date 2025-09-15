@@ -3,17 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { AlertCircle, Bot, User as UserIcon, ThumbsUp, ThumbsDown, RotateCcw, Send } from 'lucide-react';
 import userAvatar from '../assets/default-avatar.svg';
 import Sidebar from '../components/Sidebar';
-import { initializeGemini, sendMessageToGemini } from '../lib/gemini';
+import { initializeGemini, sendMessageToGemini, geminiService } from '../lib/gemini';
+import PreferencesWidget from '../components/PreferencesWidget';
 
 const Chat = () => {
   const navigate = useNavigate();
-  const [messages, setMessages] = useState([
-    {
-      type: "ai",
-      content: "Hey there, adventure seeker! 🚀 Ready to discover some incredible places? Drop me a message and let's start crafting your perfect Indian getaway!",
-      timestamp: new Date()
-    }
-  ]);
+  const [messages, setMessages] = useState([]);
 
   const [newMessage, setNewMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -45,6 +40,19 @@ const Chat = () => {
         setIsGeminiInitialized(initialized);
         if (!initialized) {
           setError('Gemini API is not configured. Please add your API key to the .env file.');
+        }
+        if (initialized) {
+          // Load persisted context if any
+          try {
+            const persisted = sessionStorage.getItem('tripContext');
+            if (persisted) {
+              setTripContext(JSON.parse(persisted));
+            }
+          } catch {}
+
+          // Show model's initial greeting as first message
+          const greeting = geminiService.getInitialGreeting();
+          setMessages([{ type: 'ai', content: greeting, timestamp: new Date() }]);
         }
       } catch (error) {
         console.error('Failed to initialize Gemini:', error);
@@ -129,6 +137,11 @@ const Chat = () => {
     } else if (lowerMessage.includes('couple') || lowerMessage.includes('two of us')) {
       newContext.travelers = 2;
     }
+  
+    // Persist on every extraction
+    try {
+      sessionStorage.setItem('tripContext', JSON.stringify(newContext));
+    } catch {}
 
     return newContext;
   };
@@ -151,7 +164,9 @@ const Chat = () => {
       if (aiResponse.toLowerCase().includes("let's move on to your travel preferences")) {
         updatedContext.isComplete = true;
         setTripContext(updatedContext);
-
+       
+        try { sessionStorage.setItem('tripContext', JSON.stringify(updatedContext)); } catch {}
+        
         setTimeout(() => {
           setMessages(prev => [...prev, {
             type: "ai",
@@ -224,25 +239,8 @@ Time to personalize your ${updatedContext.destination} experience! 🎯`,
     }
   };
 
-  // Get categories for a destination
-  const getCategories = (destination) => [
-    `${destination}: Attractions`,
-    `${destination}: Day Trips`,
-    `${destination}: Hidden Gems`,
-    `${destination}: Food & Cafes`
-  ];
-
-  // Toggle selected experiences
-  const toggleExperience = (experienceId) => {
-    setSelectedExperiences(prev =>
-      prev.includes(experienceId)
-        ? prev.filter(id => id !== experienceId)
-        : [...prev, experienceId]
-    );
-  };
-
   // Handle completion of preferences selection
-  const handlePreferencesComplete = () => {
+  const handlePreferencesComplete = (pickedIds: string[]) => {
     const tripData = {
       destination: tripContext.destination,
       from: tripContext.startLocation,
@@ -250,7 +248,7 @@ Time to personalize your ${updatedContext.destination} experience! 🎯`,
       endDate: tripContext.endDate,
       duration: tripContext.duration,
       travelers: tripContext.travelers,
-      preferences: selectedExperiences
+      preferences: pickedIds
     };
 
     try {
@@ -259,13 +257,13 @@ Time to personalize your ${updatedContext.destination} experience! 🎯`,
       console.log('SessionStorage not available');
     }
 
-    setMessages(prev => [...prev,
-    { type: "user", content: "Perfect! I've selected my preferences!", timestamp: new Date() },
-    {
-      type: "ai",
-      content: `🚀 Incredible! Your personalized ${tripContext.destination} adventure is taking shape! I'm crafting something amazing with your ${selectedExperiences.length} handpicked experiences. Ready to explore? Let's make this happen! 🎉✨`,
-      timestamp: new Date()
-    }
+    setMessages(prev => [...prev, 
+      { type: "user", content: "Perfect! I've selected my preferences!", timestamp: new Date() },
+      { 
+        type: "ai", 
+        content: `🚀 Incredible! Your personalized ${tripContext.destination} adventure is taking shape! I'm crafting something amazing with your ${pickedIds.length} handpicked experiences. Ready to explore? Let's make this happen! 🎉✨`, 
+        timestamp: new Date() 
+      }
     ]);
 
     setTimeout(() => {
@@ -273,64 +271,7 @@ Time to personalize your ${updatedContext.destination} experience! 🎯`,
     }, 2500);
   };
 
-  // Get dummy experiences for a destination
-  const getDummyExperiences = (destination) => [
-    {
-      id: "attraction-1",
-      title: `${destination} Main Attraction`,
-      description: `Experience the most iconic landmark and cultural hub of ${destination}.`,
-      image: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=300&fit=crop&q=80",
-      category: `${destination}: Attractions`,
-      rating: 4.8,
-      duration: "4-6 hours",
-      price: "₹500-1500",
-      tags: ["Culture", "Historic", "Photography"]
-    },
-    {
-      id: "attraction-2",
-      title: `${destination} Heritage Site`,
-      description: `Ancient temples and heritage sites showcasing ${destination}'s rich history.`,
-      image: "https://images.unsplash.com/photo-1582510003544-4d00b7f74220?w=400&h=300&fit=crop&q=80",
-      category: `${destination}: Attractions`,
-      rating: 4.6,
-      duration: "2-3 hours",
-      price: "₹100-500",
-      tags: ["Spiritual", "Architecture", "History"]
-    },
-    {
-      id: "daytrip-1",
-      title: `${destination} Adventure Day`,
-      description: `Full day adventure with outdoor activities and natural exploration.`,
-      image: "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=400&h=300&fit=crop&q=80",
-      category: `${destination}: Day Trips`,
-      rating: 4.5,
-      duration: "Full day",
-      price: "₹1500-3000",
-      tags: ["Adventure", "Nature", "Trekking"]
-    },
-    {
-      id: "hidden-1",
-      title: `${destination} Hidden Gem`,
-      description: `Secret spots known only to locals, perfect for unique experiences.`,
-      image: "https://images.unsplash.com/photo-1564507592333-c60657eea523?w=400&h=300&fit=crop&q=80",
-      category: `${destination}: Hidden Gems`,
-      rating: 4.8,
-      duration: "3-4 hours",
-      price: "₹300-600",
-      tags: ["Nature", "Photography", "Off-beat"]
-    },
-    {
-      id: "food-1",
-      title: `${destination} Food Experience`,
-      description: `Authentic street food tour and local culinary specialties.`,
-      image: "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=400&h=300&fit=crop&q=80",
-      category: `${destination}: Food & Cafes`,
-      rating: 4.9,
-      duration: "3-4 hours",
-      price: "₹500-1000",
-      tags: ["Food", "Street Food", "Local"]
-    }
-  ];
+  // Dummy data generation now moved into PreferencesWidget
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950 font-['Inter',sans-serif]">
@@ -386,81 +327,10 @@ Time to personalize your ${updatedContext.destination} experience! 🎯`,
           ))}
 
           {preferencesShown && tripContext.isComplete && (
-            <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-700">
-              <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-lg rounded-xl p-6 shadow-lg border border-slate-200/50 dark:border-slate-700/50">
-                <h3 className="text-lg font-semibold mb-4 text-slate-900 dark:text-slate-100">
-                  Choose Your Travel Style
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {getCategories(tripContext.destination).map((category) => (
-                    <button
-                      key={category}
-                      onClick={() => setSelectedCategory(category)}
-                      className={`px-4 py-2 rounded-full text-sm transition-all duration-300 ${
-                        selectedCategory === category
-                          ? "bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-md"
-                          : "bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600"
-                        }`}
-                    >
-                      {category.split(":")[1]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {selectedCategory && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in-50 duration-500">
-                  {getDummyExperiences(tripContext.destination)
-                    .filter((exp) => exp.category === selectedCategory)
-                    .map((experience, index) => (
-                      <div
-                        key={experience.id}
-                        className={`group bg-white/95 dark:bg-slate-800/95 backdrop-blur-lg rounded-xl overflow-hidden cursor-pointer transition-all duration-300 shadow-md hover:shadow-xl border border-slate-200/50 dark:border-slate-700/50 animate-in slide-in-from-bottom-2 ${
-                          selectedExperiences.includes(experience.id)
-                            ? "ring-2 ring-purple-500 shadow-purple-100 dark:shadow-purple-900/20"
-                            : "hover:ring-2 hover:ring-purple-200 dark:hover:ring-purple-800"
-                          }`}
-                        style={{
-                          animationDelay: `${index * 100}ms`
-                        }}
-                        onClick={() => toggleExperience(experience.id)}
-                      >
-                        <div className="relative">
-                          <img
-                            src={experience.image}
-                            alt={experience.title}
-                            className="w-full h-48 object-cover transition-transform duration-500 group-hover:scale-105"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
-                        </div>
-                        <div className="p-4">
-                          <h4 className="font-semibold text-slate-900 dark:text-slate-100 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
-                            {experience.title}
-                          </h4>
-                          <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 line-clamp-2">
-                            {experience.description}
-                          </p>
-                          <div className="flex items-center justify-between mt-4 text-sm">
-                            <span className="text-slate-600 dark:text-slate-300">{experience.duration}</span>
-                            <span className="font-medium text-purple-600 dark:text-purple-400">{experience.price}</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )}
-
-              {selectedExperiences.length > 0 && (
-                <div className="flex justify-center animate-in slide-in-from-bottom-4 duration-500">
-                  <button
-                    onClick={handlePreferencesComplete}
-                    className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white px-8 py-3 rounded-full font-medium shadow-lg hover:shadow-xl transition-all duration-300 active:scale-95 transform"
-                  >
-                    Continue with {selectedExperiences.length} experiences
-                  </button>
-                </div>
-              )}
-            </div>
+            <PreferencesWidget
+              destination={tripContext.destination || 'Trip'}
+              onComplete={handlePreferencesComplete}
+            />
           )}
 
           {isTyping && (
@@ -495,9 +365,9 @@ Time to personalize your ${updatedContext.destination} experience! 🎯`,
                 Send
               </button>
             </div>
-          </div>
+          </div>  
         </div>
-      </div>
+      </div>    
     </div>
   );
 };
