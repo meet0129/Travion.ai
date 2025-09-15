@@ -21,6 +21,31 @@ const Chat = () => {
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
   const messagesEndRef = useRef(null);
 
+  // Utilities: normalize natural date strings and compute duration
+  const normalizeDateString = (value) => {
+    if (!value) return '';
+    const months = { jan:'01', feb:'02', mar:'03', apr:'04', may:'05', jun:'06', jul:'07', aug:'08', sep:'09', oct:'10', nov:'11', dec:'12' };
+    const parts = value.toLowerCase().replace(/(st|nd|rd|th)/g, '').trim().split(/\s+/);
+    if (parts.length < 2) return '';
+    const day = parts[0].padStart(2, '0');
+    const month = months[parts[1].slice(0,3)] || '';
+    const year = parts[2] || String(new Date().getFullYear());
+    if (!month) return '';
+    return `${year}-${month}-${day}`;
+  };
+
+  const computeDurationFromDates = (start, end) => {
+    const s = normalizeDateString(start);
+    const e = normalizeDateString(end);
+    if (!s || !e) return '';
+    const sd = new Date(s);
+    const ed = new Date(e);
+    if (isNaN(sd.getTime()) || isNaN(ed.getTime())) return '';
+    const ms = Math.max(ed.getTime() - sd.getTime(), 0);
+    const days = Math.ceil(ms / (1000 * 60 * 60 * 24)) || 0;
+    return `${days} days`;
+  };
+
   // Simplified trip context - only essential info
   const [tripContext, setTripContext] = useState({
     destination: '',
@@ -160,32 +185,41 @@ const Chat = () => {
       const updatedContext = extractTripInfo(message, tripContext);
       setTripContext(updatedContext);
 
-      // If Gemini indicates all information is collected, show preferences
+      // If Gemini indicates all information is collected, show preferences after the response
       if (aiResponse.toLowerCase().includes("let's move on to your travel preferences")) {
         updatedContext.isComplete = true;
         setTripContext(updatedContext);
        
         try { sessionStorage.setItem('tripContext', JSON.stringify(updatedContext)); } catch {}
         
+        // Ensure duration is computed if dates are present
+        if (!updatedContext.duration && updatedContext.startDate && updatedContext.endDate) {
+          const computed = computeDurationFromDates(updatedContext.startDate, updatedContext.endDate);
+          if (computed) {
+            updatedContext.duration = computed;
+            try { sessionStorage.setItem('tripContext', JSON.stringify(updatedContext)); } catch {}
+            setTripContext({ ...updatedContext });
+          }
+        }
+
+        // Persist a concise trip plan for later use (destination for API keys, etc.)
+        try {
+          const tripPlan = {
+            destination: updatedContext.destination || '',
+            startLocation: updatedContext.startLocation || '',
+            startDate: updatedContext.startDate || '',
+            endDate: updatedContext.endDate || '',
+            duration: updatedContext.duration || '',
+            travelers: updatedContext.travelers || 0,
+            createdAt: new Date().toISOString()
+          };
+          sessionStorage.setItem('tripPlan', JSON.stringify(tripPlan));
+        } catch {}
+
+        // Set flag to show preferences after the AI response is displayed
         setTimeout(() => {
-          setMessages(prev => [...prev, {
-            type: "ai",
-            content: `🎊 Here's your travel plan:
-
-📍 **Destination:** ${updatedContext.destination}
-🚀 **Starting from:** ${updatedContext.startLocation}  
-📅 **Dates:** ${updatedContext.startDate}${updatedContext.endDate ? ` to ${updatedContext.endDate}` : ''}
-⏰ **Duration:** ${updatedContext.duration || 'To be calculated'}
-👥 **Travel squad:** ${updatedContext.travelers} ${updatedContext.travelers === 1 ? 'solo explorer' : 'adventurers'}
-
-Time to personalize your ${updatedContext.destination} experience! 🎯`,
-            timestamp: new Date()
-          }]);
-
-          setTimeout(() => {
-            setPreferencesShown(true);
-          }, 1500);
-        }, 1000);
+          setPreferencesShown(true);
+        }, 2000); // Wait 2 seconds after the AI response appears
       }
 
       return aiResponse;
@@ -326,9 +360,9 @@ Time to personalize your ${updatedContext.destination} experience! 🎯`,
             </div>
           ))}
 
-          {preferencesShown && tripContext.isComplete && (
+          {preferencesShown && tripContext.destination && (
             <PreferencesWidget
-              destination={tripContext.destination || 'Trip'}
+              destination={tripContext.destination}
               onComplete={handlePreferencesComplete}
             />
           )}
