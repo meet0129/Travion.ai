@@ -1,113 +1,60 @@
-import { Button } from "@/components/ui/button";
-import { ArrowRight, ChevronDown, ChevronUp, Heart } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import Sidebar from "@/components/Sidebar";
+import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { AlertCircle } from 'lucide-react';
+import Sidebar from '../components/Sidebar';
+import { initializeGemini, sendMessageToGemini } from '../lib/gemini';
 
 const Chat = () => {
   const navigate = useNavigate();
   const [messages, setMessages] = useState([
     {
       type: "ai",
-      content: "I'm Airial, your personal AI travel agent. Simply describe your trip and I will create a fully personalized dream vacation for you planned to the last detail - flights, hotels and day-by-day plans.\n\nYour perfect vacation is seconds away — what's on your mind?",
+      content: "Hey there, adventure seeker! 🚀 Ready to discover some incredible places? Drop me a message and let's start crafting your perfect Indian getaway!",
       timestamp: new Date()
     }
   ]);
 
   const [newMessage, setNewMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [isGeminiInitialized, setIsGeminiInitialized] = useState(false);
+  const [error, setError] = useState(null);
   const [isVibeExpanded, setIsVibeExpanded] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [preferencesShown, setPreferencesShown] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedExperiences, setSelectedExperiences] = useState([]);
+  const [hasUserInteracted, setHasUserInteracted] = useState(false);
+  const messagesEndRef = useRef(null);
 
-  // Trip data collection - shared with other components
-  const [tripData, setTripData] = useState({
+  // Simplified trip context - only essential info
+  const [tripContext, setTripContext] = useState({
     destination: '',
-    from: '',
+    startLocation: '',
+    startDate: '',
+    endDate: '',
     duration: '',
-    travelTime: '',
-    travelers: 1,
-    preferences: []
+    travelers: 0,
+    isComplete: false
   });
 
-  // Questions flow for progressive data collection
-  const questions = [
-    {
-      trigger: ['destination', 'go', 'visit', 'trip', 'travel', 'manali', 'goa', 'kerala'],
-      response: (userInput) => {
-        const destination = extractDestination(userInput);
-        setTripData(prev => ({ ...prev, destination }));
-        return `${destination} sounds amazing! Where will you be traveling from?`;
+  // Initialize Gemini on component mount
+  useEffect(() => {
+    const initGemini = async () => {
+      try {
+        const initialized = await initializeGemini();
+        setIsGeminiInitialized(initialized);
+        if (!initialized) {
+          setError('Gemini API is not configured. Please add your API key to the .env file.');
+        }
+      } catch (error) {
+        console.error('Failed to initialize Gemini:', error);
+        setError('Failed to initialize AI service. Please try again.');
       }
-    },
-    {
-      trigger: ['from', 'starting', 'ahmedabad', 'mumbai', 'delhi', 'bangalore'],
-      response: (userInput) => {
-        const from = extractLocation(userInput);
-        setTripData(prev => ({ ...prev, from }));
-        return `Perfect! How many days are you planning to stay?`;
-      }
-    },
-    {
-      trigger: ['days', 'day', 'week', 'month', '5', '7', '10'],
-      response: (userInput) => {
-        const duration = extractDuration(userInput);
-        setTripData(prev => ({ ...prev, duration }));
-        return `Great! When are you planning to travel?`;
-      }
-    },
-    {
-      trigger: ['when', 'october', 'november', 'december', 'january', 'february'],
-      response: (userInput) => {
-        const travelTime = extractTravelTime(userInput);
-        setTripData(prev => ({ ...prev, travelTime }));
-        return `Excellent timing! How many people will be traveling?`;
-      }
-    },
-    {
-      trigger: ['people', 'person', 'travelers', 'members', '1', '2', '3', '4'],
-      response: (userInput) => {
-        const travelers = extractTravelers(userInput);
-        setTripData(prev => ({ ...prev, travelers }));
-        return `Perfect! Based on your ${tripData.destination || 'destination'} trip details, let me show you some amazing experiences to choose from. I'll create a personalized selection for you!`;
-      }
-    }
-  ];
+    };
 
-  // Helper functions to extract information from user messages
-  const extractDestination = (text) => {
-    const destinations = ['manali', 'goa', 'kerala', 'rajasthan', 'himachal', 'ladakh', 'shimla'];
-    const found = destinations.find(dest => text.toLowerCase().includes(dest));
-    return found ? found.charAt(0).toUpperCase() + found.slice(1) : 'your destination';
-  };
+    initGemini();
+  }, []);
 
-  const extractLocation = (text) => {
-    const locations = ['ahmedabad', 'mumbai', 'delhi', 'bangalore', 'pune', 'hyderabad', 'chennai'];
-    const found = locations.find(loc => text.toLowerCase().includes(loc));
-    return found ? found.charAt(0).toUpperCase() + found.slice(1) : 'your location';
-  };
-
-  const extractDuration = (text) => {
-    const match = text.match(/(\d+)\s*(day|week)/i);
-    if (match) {
-      return `${match[1]} ${match[2]}${match[1] > 1 ? 's' : ''}`;
-    }
-    const numberMatch = text.match(/(\d+)/);
-    return numberMatch ? `${numberMatch[1]} days` : '5 days';
-  };
-
-  const extractTravelTime = (text) => {
-    const months = ['january', 'february', 'march', 'april', 'may', 'june', 
-                   'july', 'august', 'september', 'october', 'november', 'december'];
-    const found = months.find(month => text.toLowerCase().includes(month));
-    return found ? found.charAt(0).toUpperCase() + found.slice(1) : 'October';
-  };
-
-  const extractTravelers = (text) => {
-    const match = text.match(/(\d+)/);
-    return match ? parseInt(match[1]) : 1;
-  };
-
+  // Auto-scroll to bottom with smooth animation
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -116,197 +63,403 @@ const Chat = () => {
     scrollToBottom();
   }, [messages]);
 
-  const processMessage = (message) => {
-    const lowerMessage = message.toLowerCase();
+  // Extract trip information from message
+  const extractTripInfo = (message, currentContext) => {
+    const newContext = { ...currentContext };
+    const lowerMessage = message.toLowerCase().trim();
     
-    // Check if we should show preferences after collecting all data
-    if (currentQuestion >= questions.length - 1 && !isVibeExpanded) {
-      setTimeout(() => {
-        setIsVibeExpanded(true);
-      }, 1000);
-      return;
-    }
-
-    // Process based on current question in the flow
-    const question = questions[currentQuestion];
-    if (question && question.trigger.some(trigger => lowerMessage.includes(trigger))) {
-      const response = question.response(message);
-      setCurrentQuestion(prev => prev + 1);
-      return response;
-    }
-
-    // Default responses for unmatched messages
-    const defaultResponses = [
-      "That's interesting! Could you tell me more about your travel plans?",
-      "I'd love to help you plan the perfect trip. What destination do you have in mind?",
-      "Great! Let's start planning your adventure. Where would you like to go?"
+    // Extract destination
+    const indianDestinations = [
+      'goa', 'kerala', 'rajasthan', 'mumbai', 'delhi', 'bangalore', 'chennai', 
+      'kolkata', 'jaipur', 'udaipur', 'jodhpur', 'agra', 'varanasi', 'rishikesh', 
+      'manali', 'shimla', 'darjeeling', 'ooty', 'kodaikanal', 'munnar', 'alleppey', 
+      'kochi', 'mysore', 'hampi'
     ];
     
-    return defaultResponses[Math.floor(Math.random() * defaultResponses.length)];
+    for (const dest of indianDestinations) {
+      if (lowerMessage.includes(dest)) {
+        newContext.destination = dest.charAt(0).toUpperCase() + dest.slice(1);
+        break;
+      }
+    }
+    
+    // Extract start location
+    const indianCities = [
+      'mumbai', 'delhi', 'bangalore', 'chennai', 'kolkata', 'hyderabad', 'pune', 
+      'ahmedabad', 'jaipur', 'surat', 'lucknow', 'kochi', 'chandigarh'
+    ];
+    
+    for (const city of indianCities) {
+      if (lowerMessage.includes(`from ${city}`)) {
+        newContext.startLocation = city.charAt(0).toUpperCase() + city.slice(1);
+        break;
+      }
+    }
+    
+    // Extract dates and duration
+    const dateMatch = message.match(/(\d{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*(?:\s+\d{4})?)/gi);
+    if (dateMatch) {
+      if (!newContext.startDate) {
+        newContext.startDate = dateMatch[0];
+        if (dateMatch[1]) {
+          newContext.endDate = dateMatch[1];
+        }
+      }
+    }
+    
+    const durationMatch = message.match(/(\d+)\s*(?:days?|weeks?|months?)/i);
+    if (durationMatch) {
+      const num = parseInt(durationMatch[1]);
+      if (durationMatch[0].includes('week')) {
+        newContext.duration = `${num * 7} days`;
+      } else if (durationMatch[0].includes('month')) {
+        newContext.duration = `${num * 30} days`;
+      } else {
+        newContext.duration = `${num} days`;
+      }
+    }
+    
+    // Extract number of travelers
+    const travelerMatch = message.match(/(\d+)\s*(?:people|persons?|travelers?|friends?|family\s*members?)/i);
+    if (travelerMatch) {
+      newContext.travelers = parseInt(travelerMatch[1]);
+    } else if (lowerMessage.includes('solo') || lowerMessage.includes('alone') || lowerMessage.includes('just me')) {
+      newContext.travelers = 1;
+    } else if (lowerMessage.includes('couple') || lowerMessage.includes('two of us')) {
+      newContext.travelers = 2;
+    }
+    
+    return newContext;
   };
 
-  const handleSendMessage = () => {
-    if (newMessage.trim()) {
-      const userMessage = { type: "user", content: newMessage, timestamp: new Date() };
-      setMessages(prev => [...prev, userMessage]);
+  // Process message and handle conversation flow
+  const processMessage = async (message) => {
+    if (!isGeminiInitialized) {
+      throw new Error('Gemini AI is not initialized');
+    }
+
+    try {
+      // Send message to Gemini and get response
+      const aiResponse = await sendMessageToGemini(message, tripContext);
       
-      const messageContent = newMessage;
-      setNewMessage("");
-      setIsTyping(true);
-      
-      setTimeout(() => {
-        const aiResponse = processMessage(messageContent);
-        if (aiResponse) {
+      // Extract information from user's message
+      const updatedContext = extractTripInfo(message, tripContext);
+      setTripContext(updatedContext);
+
+      // If Gemini indicates all information is collected, show preferences
+      if (aiResponse.toLowerCase().includes("let's move on to your travel preferences")) {
+        updatedContext.isComplete = true;
+        setTripContext(updatedContext);
+        
+        setTimeout(() => {
           setMessages(prev => [...prev, { 
             type: "ai", 
-            content: aiResponse,
+            content: `🎊 Here's your travel plan:
+
+📍 **Destination:** ${updatedContext.destination}
+🚀 **Starting from:** ${updatedContext.startLocation}  
+📅 **Dates:** ${updatedContext.startDate}${updatedContext.endDate ? ` to ${updatedContext.endDate}` : ''}
+⏰ **Duration:** ${updatedContext.duration || 'To be calculated'}
+👥 **Travel squad:** ${updatedContext.travelers} ${updatedContext.travelers === 1 ? 'solo explorer' : 'adventurers'}
+
+Time to personalize your ${updatedContext.destination} experience! 🎯`,
             timestamp: new Date()
           }]);
-        }
-        setIsTyping(false);
-      }, 1500);
+          
+          setTimeout(() => {
+            setPreferencesShown(true);
+          }, 1500);
+        }, 1000);
+      }
+      
+      return aiResponse;
+    } catch (error) {
+      console.error('Error processing message:', error);
+      throw error;
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !isGeminiInitialized) return;
+
+    const userMessage = { type: "user", content: newMessage, timestamp: new Date() };
+    setMessages(prev => [...prev, userMessage]);
+    
+    const messageContent = newMessage;
+    setNewMessage("");
+    setIsTyping(true);
+    setError(null);
+    setHasUserInteracted(true);
+    
+    try {
+      const aiResponse = await processMessage(messageContent);
+      setTimeout(() => {
+        setMessages(prev => [...prev, { 
+          type: "ai", 
+          content: aiResponse,
+          timestamp: new Date()
+        }]);
+        setIsTyping(false);
+      }, 800);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setError(error instanceof Error ? error.message : 'An error occurred while processing your message');
+      
+      setTimeout(() => {
+        setMessages(prev => [...prev, { 
+          type: "ai", 
+          content: "Oops! Something went wrong on my end. Mind giving that another shot? 🔄",
+          timestamp: new Date()
+        }]);
+        setIsTyping(false);
+      }, 500);
+    }
+  };
+
+  const handleKeyPress = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
   };
 
-  const handleExpandVibe = () => {
-    setIsVibeExpanded(true);
+  // Get categories for a destination
+  const getCategories = (destination) => [
+    `${destination}: Attractions`,
+    `${destination}: Day Trips`, 
+    `${destination}: Hidden Gems`,
+    `${destination}: Food & Cafes`
+  ];
+
+  // Toggle selected experiences
+  const toggleExperience = (experienceId) => {
+    setSelectedExperiences(prev => 
+      prev.includes(experienceId)
+        ? prev.filter(id => id !== experienceId)
+        : [...prev, experienceId]
+    );
   };
 
+  // Handle completion of preferences selection
   const handlePreferencesComplete = () => {
-    // Store trip data in localStorage for other components to access
-    localStorage.setItem('tripData', JSON.stringify(tripData));
+    const tripData = {
+      destination: tripContext.destination,
+      from: tripContext.startLocation,
+      startDate: tripContext.startDate,
+      endDate: tripContext.endDate,
+      duration: tripContext.duration,
+      travelers: tripContext.travelers,
+      preferences: selectedExperiences
+    };
+    
+    try {
+      sessionStorage.setItem('tripData', JSON.stringify(tripData));
+    } catch (e) {
+      console.log('SessionStorage not available');
+    }
     
     setMessages(prev => [...prev, 
-      { type: "user", content: "I've selected my preferences!", timestamp: new Date() },
+      { type: "user", content: "Perfect! I've selected my preferences!", timestamp: new Date() },
       { 
         type: "ai", 
-        content: "Excellent choices! Based on your preferences, I've curated the perfect destinations for your trip. Let me show you the itinerary.", 
+        content: `🚀 Incredible! Your personalized ${tripContext.destination} adventure is taking shape! I'm crafting something amazing with your ${selectedExperiences.length} handpicked experiences. Ready to explore? Let's make this happen! 🎉✨`, 
         timestamp: new Date() 
       }
     ]);
     
-    // Navigate to destinations page
     setTimeout(() => {
       navigate("/destinations");
-    }, 2000);
+    }, 2500);
   };
 
+  // Get dummy experiences for a destination
+  const getDummyExperiences = (destination) => [
+    {
+      id: "attraction-1",
+      title: `${destination} Main Attraction`,
+      description: `Experience the most iconic landmark and cultural hub of ${destination}.`,
+      image: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=300&fit=crop&q=80",
+      category: `${destination}: Attractions`,
+      rating: 4.8,
+      duration: "4-6 hours",
+      price: "₹500-1500",
+      tags: ["Culture", "Historic", "Photography"]
+    },
+    {
+      id: "attraction-2", 
+      title: `${destination} Heritage Site`,
+      description: `Ancient temples and heritage sites showcasing ${destination}'s rich history.`,
+      image: "https://images.unsplash.com/photo-1582510003544-4d00b7f74220?w=400&h=300&fit=crop&q=80",
+      category: `${destination}: Attractions`,
+      rating: 4.6,
+      duration: "2-3 hours",
+      price: "₹100-500",
+      tags: ["Spiritual", "Architecture", "History"]
+    },
+    {
+      id: "daytrip-1",
+      title: `${destination} Adventure Day`,
+      description: `Full day adventure with outdoor activities and natural exploration.`,
+      image: "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=400&h=300&fit=crop&q=80", 
+      category: `${destination}: Day Trips`,
+      rating: 4.5,
+      duration: "Full day",
+      price: "₹1500-3000",
+      tags: ["Adventure", "Nature", "Trekking"]
+    },
+    {
+      id: "hidden-1",
+      title: `${destination} Hidden Gem`,
+      description: `Secret spots known only to locals, perfect for unique experiences.`,
+      image: "https://images.unsplash.com/photo-1564507592333-c60657eea523?w=400&h=300&fit=crop&q=80",
+      category: `${destination}: Hidden Gems`,
+      rating: 4.8,
+      duration: "3-4 hours",
+      price: "₹300-600",
+      tags: ["Nature", "Photography", "Off-beat"]
+    },
+    {
+      id: "food-1",
+      title: `${destination} Food Experience`,
+      description: `Authentic street food tour and local culinary specialties.`,
+      image: "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=400&h=300&fit=crop&q=80",
+      category: `${destination}: Food & Cafes`,
+      rating: 4.9,
+      duration: "3-4 hours",
+      price: "₹500-1000",
+      tags: ["Food", "Street Food", "Local"]
+    }
+  ];
+  
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 font-['Inter',sans-serif]">
       <div className="w-full max-w-4xl mx-auto px-4 pt-6">
         <Sidebar />
         
-        {/* Chat Messages */}
+        {error && (
+          <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-3 animate-in slide-in-from-top-4 duration-300">
+            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+            <div className="text-red-700 dark:text-red-300 text-sm font-medium">{error}</div>
+          </div>
+        )}
+        
         <div className="space-y-6 mb-8">
           {messages.map((message, index) => (
-            <div key={index}>
-              {message.type === 'ai' ? (
-                <div className="flex gap-3 items-start">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-blue-600 flex items-center justify-center flex-shrink-0">
-                    <span className="text-white text-sm font-bold">A</span>
-                  </div>
-                  <div className="flex-1">
-                    <div className="mb-1">
-                      <span className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Airial</span>
-                    </div>
-                    <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border border-slate-200 dark:border-slate-700 rounded-2xl p-4 shadow-sm">
-                      <p className="text-slate-900 dark:text-slate-100 text-sm leading-relaxed whitespace-pre-line">
-                        {message.content}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex gap-3 items-start">
-                  <div className="w-8 h-8 rounded-full bg-slate-300 dark:bg-slate-600 flex items-center justify-center flex-shrink-0">
-                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">U</span>
-                  </div>
-                  <div className="flex-1">
-                    <div className="bg-slate-100 dark:bg-slate-700 rounded-2xl px-4 py-3 max-w-xs">
-                      <p className="text-slate-900 dark:text-slate-100 text-sm font-medium">
-                        {message.content}
-                      </p>
-                    </div>
+            <div
+              key={index}
+              className={`flex items-start gap-3 ${
+                message.type === "user" ? "flex-row-reverse" : ""
+              }`}
+            >
+              <div
+                className={`flex flex-col ${
+                  message.type === "user" ? "items-end" : "items-start"
+                }`}
+              >
+                <div
+                  className={`rounded-lg p-3 ${
+                    message.type === "user"
+                      ? "bg-blue-500 text-white"
+                      : "bg-white dark:bg-slate-800"
+                  }`}
+                >
+                  <div className="prose dark:prose-invert max-w-none">
+                    <div dangerouslySetInnerHTML={{ 
+                      __html: message.content.replace(/\n/g, '<br>') 
+                    }} />
                   </div>
                 </div>
-              )}
+                <span className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  {message.timestamp.toLocaleTimeString()}
+                </span>
+              </div>
             </div>
           ))}
 
-          {/* Vibe Preferences Section - Shows after collecting all trip details */}
-          {isVibeExpanded && (
-            <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border border-slate-200 dark:border-slate-700 rounded-2xl shadow-lg overflow-hidden">
-              <div className="p-4 border-b border-slate-200 dark:border-slate-700">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-300">Select your vibe</h3>
-                  </div>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => setIsVibeExpanded(false)}
-                    className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20"
-                  >
-                    Collapse
-                    <ChevronUp className="w-4 h-4 ml-1" />
-                  </Button>
-                </div>
-                
-                <div className="mt-4">
-                  <h4 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 mb-2">
-                    Pick What You Love 
-                    <Heart className="w-5 h-5 text-red-500 fill-red-500" />
-                  </h4>
-                  <p className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-2">
-                    <Heart className="w-4 h-4 text-red-500 fill-red-500" />
-                    Follow your inspiration — Airial will connect the dots and create a journey filled with moments that feel just right.
-                  </p>
+          {preferencesShown && tripContext.isComplete && (
+            <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-700">
+              <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-lg rounded-xl p-6 shadow-lg border border-slate-200/50 dark:border-slate-700/50">
+                <h3 className="text-lg font-semibold mb-4 text-slate-900 dark:text-slate-100">
+                  Choose Your Travel Style
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {getCategories(tripContext.destination).map((category) => (
+                    <button
+                      key={category}
+                      onClick={() => setSelectedCategory(category)}
+                      className={`px-4 py-2 rounded-full text-sm transition-all duration-300 ${
+                        selectedCategory === category
+                          ? "bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-md"
+                          : "bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600"
+                      }`}
+                    >
+                      {category.split(":")[1]}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              <div className="p-4 sm:p-6">
-                <div className="text-center py-8">
-                  <p className="text-slate-600 dark:text-slate-400 mb-4">
-                    Based on your {tripData.destination} trip, I'm preparing personalized experiences for you!
-                  </p>
-                  <Button 
-                    onClick={() => navigate("/preferences")}
-                    className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-full px-8 py-3 text-base font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
-                  >
-                    Explore Preferences
-                  </Button>
+              {selectedCategory && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in-50 duration-500">
+                  {getDummyExperiences(tripContext.destination)
+                    .filter((exp) => exp.category === selectedCategory)
+                    .map((experience, index) => (
+                      <div
+                        key={experience.id}
+                        className={`group bg-white/95 dark:bg-slate-800/95 backdrop-blur-lg rounded-xl overflow-hidden cursor-pointer transition-all duration-300 shadow-md hover:shadow-xl border border-slate-200/50 dark:border-slate-700/50 animate-in slide-in-from-bottom-2 ${
+                          selectedExperiences.includes(experience.id)
+                            ? "ring-2 ring-purple-500 shadow-purple-100 dark:shadow-purple-900/20"
+                            : "hover:ring-2 hover:ring-purple-200 dark:hover:ring-purple-800"
+                        }`}
+                        style={{
+                          animationDelay: `${index * 100}ms`
+                        }}
+                        onClick={() => toggleExperience(experience.id)}
+                      >
+                        <div className="relative">
+                          <img
+                            src={experience.image}
+                            alt={experience.title}
+                            className="w-full h-48 object-cover transition-transform duration-500 group-hover:scale-105"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+                        </div>
+                        <div className="p-4">
+                          <h4 className="font-semibold text-slate-900 dark:text-slate-100 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                            {experience.title}
+                          </h4>
+                          <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 line-clamp-2">
+                            {experience.description}
+                          </p>
+                          <div className="flex items-center justify-between mt-4 text-sm">
+                            <span className="text-slate-600 dark:text-slate-300">{experience.duration}</span>
+                            <span className="font-medium text-purple-600 dark:text-purple-400">{experience.price}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                 </div>
-              </div>
+              )}
+
+              {selectedExperiences.length > 0 && (
+                <div className="flex justify-center animate-in slide-in-from-bottom-4 duration-500">
+                  <button
+                    onClick={handlePreferencesComplete}
+                    className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white px-8 py-3 rounded-full font-medium shadow-lg hover:shadow-xl transition-all duration-300 active:scale-95 transform"
+                  >
+                    Continue with {selectedExperiences.length} experiences
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Typing Indicator */}
           {isTyping && (
-            <div className="flex gap-3 items-start">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-blue-600 flex items-center justify-center flex-shrink-0">
-                <span className="text-white text-sm font-bold">A</span>
-              </div>
-              <div className="flex-1">
-                <div className="mb-1">
-                  <span className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Airial</span>
-                </div>
-                <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border border-slate-200 dark:border-slate-700 rounded-2xl p-4 shadow-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                    </div>
-                    <span className="text-slate-600 dark:text-slate-400 text-xs">Thinking...</span>
-                  </div>
-                </div>
+            <div className="flex items-center gap-3">
+              <div className="flex space-x-2 bg-white dark:bg-slate-800 rounded-lg p-3">
+                <div className="w-2 h-2 bg-slate-300 dark:bg-slate-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                <div className="w-2 h-2 bg-slate-300 dark:bg-slate-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                <div className="w-2 h-2 bg-slate-300 dark:bg-slate-600 rounded-full animate-bounce"></div>
               </div>
             </div>
           )}
@@ -314,44 +467,28 @@ const Chat = () => {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Enhanced Chat Input */}
         <div className="sticky bottom-0 bg-gradient-to-t from-slate-50 via-slate-50/95 to-transparent dark:from-slate-900 dark:via-slate-900/95 pt-4">
-          <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-lg rounded-2xl shadow-lg overflow-hidden">
-            <div className="flex items-center gap-3 p-4">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-blue-600 flex items-center justify-center flex-shrink-0">
-                <span className="text-white text-sm font-semibold">A</span>
-              </div>
-              <div className="flex-1 flex items-center gap-3">
-                <input 
-                  type="text" 
-                  placeholder="Ask Airial ..."
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  className="flex-1 bg-transparent border-none outline-none text-slate-900 dark:text-slate-100 text-sm placeholder:text-slate-500 dark:placeholder:text-slate-400"
-                />
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="w-8 h-8 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                  >
-                    <ChevronDown className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    onClick={handleSendMessage}
-                    disabled={!newMessage.trim()}
-                    className="w-8 h-8 bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ArrowRight className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
+          <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-lg rounded-2xl shadow-xl overflow-hidden border border-slate-200/50 dark:border-slate-700/50">
+            <div className="flex items-end gap-2 p-4">
+              <textarea
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Type your message..."
+                className="flex-1 bg-transparent border-0 focus:ring-0 resize-none h-10 max-h-40 overflow-auto"
+                style={{ height: "40px" }}
+              />
+              <button
+                onClick={handleSendMessage}
+                disabled={!newMessage.trim() || !isGeminiInitialized}
+                className="bg-blue-500 text-white px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-600 transition-colors"
+              >
+                Send
+              </button>
             </div>
-          </div>
+          </div>  
         </div>
-      </div>
+      </div>    
     </div>
   );
 };
