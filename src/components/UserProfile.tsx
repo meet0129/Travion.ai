@@ -38,7 +38,7 @@ const UserProfile = () => {
             className="w-full h-full rounded-full object-cover"
           />
         ) : (
-          <img 
+          <img
             src="/src/assets/default-avatar.svg" 
             alt="Default Profile" 
             className="w-full h-full rounded-full object-cover"
