@@ -1,27 +1,56 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, Home, MessageCircle, Heart, MapPin, Briefcase, User } from "lucide-react";
+import { Home, MessageCircle, Briefcase, User } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import UserProfile from "@/components/UserProfile";
 import { useNavigate } from "react-router-dom";
 
-const   Sidebar = () => {
+const Sidebar = () => {
   const [isCollapsed, setIsCollapsed] = useState(true);
   const { currentUser } = useAuth();
   const navigate = useNavigate();
+  const sidebarRef = useRef<HTMLDivElement>(null);
 
   const menuItems = [
     { icon: Home, label: "Home", path: "/" },
     { icon: MessageCircle, label: "Chat", path: "/chat" },
-    { icon: Heart, label: "Wishlist", path: "/preferences" },
-    { icon: MapPin, label: "Explore", path: "/destinations" },
   ];
+
+  const profileItems = [
+    { icon: User, label: "My Profile", path: "/profile" },
+  ];
+
+  // Handle click outside to collapse sidebar
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        !isCollapsed &&
+        sidebarRef.current &&
+        !sidebarRef.current.contains(event.target as Node)
+      ) {
+        setIsCollapsed(true);
+      }
+    };
+
+    // Add event listener when sidebar is expanded
+    if (!isCollapsed) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    // Cleanup event listener
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isCollapsed]);
 
   return (
     <>
       {/* Collapsed Sidebar - Show icons only */}
       {isCollapsed && (
-        <div className="fixed left-0 top-0 h-full bg-background/95 backdrop-blur-md border-r border-border z-40 shadow-lg w-16 flex flex-col">
+        <div 
+          ref={sidebarRef}
+          className="fixed left-0 top-0 h-full bg-background/95 backdrop-blur-md border-r border-border z-40 shadow-lg w-16 flex flex-col"
+        >
           {/* Brand Icon */}
           <div className="p-3 border-b border-border/50">
             <Button
@@ -48,6 +77,19 @@ const   Sidebar = () => {
                   title="My trips"
                 >
                   <Briefcase className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+                </Button>
+              )}
+
+              {/* Profile Icon - Only show if logged in */}
+              {currentUser && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-12 h-12 p-0 hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all duration-200 group"
+                  title="My Profile"
+                  onClick={() => navigate("/profile")}
+                >
+                  <User className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
                 </Button>
               )}
 
@@ -100,19 +142,18 @@ const   Sidebar = () => {
 
       {/* Expanded Sidebar */}
       {!isCollapsed && (
-        <div className="fixed left-0 top-0 h-full bg-background/95 backdrop-blur-md border-r border-border z-40 transition-all duration-500 ease-in-out shadow-2xl w-64">
+        <div 
+          ref={sidebarRef}
+          className="fixed left-0 top-0 h-full bg-background/95 backdrop-blur-md border-r border-border z-40 transition-all duration-500 ease-in-out shadow-2xl w-64"
+        >
           {/* Header with Brand */}
           <div className="p-4 border-b border-border/50 bg-gradient-to-r from-primary/5 to-transparent">
-            <div className="flex items-center gap-2 mb-4 group">
-              <ChevronLeft
-                className="w-5 h-5 text-muted-foreground cursor-pointer hover:text-primary transition-all duration-200 group-hover:scale-110"
-                onClick={() => setIsCollapsed(true)}
-              />
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center hover:rotate-12 transition-transform duration-300">
+            <div className="flex items-center mb-4 group">
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:transition-all duration-200 cursor-pointer group hover:scale-105" onClick={() => navigate("/")}>
+                <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center">
                   <span className="text-lg">✈️</span>
                 </div>
-                <span className="text-lg font-bold text-foreground">Travion</span>
+                <span className="text-lg font-bold text-foreground">Travion.ai</span>
               </div>
             </div>
 
@@ -120,7 +161,21 @@ const   Sidebar = () => {
             {currentUser && (
               <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-primary/10 transition-all duration-200 cursor-pointer group hover:scale-105">
                 <Briefcase className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
-                <span className="font-medium text-foreground">My trips</span>
+                <span className="font-medium text-foreground">My Trips</span>
+              </div>
+            )}
+
+            {/* Profile Section - Only show if logged in */}
+            {currentUser && (
+              <div 
+                className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-primary/10 transition-all duration-200 cursor-pointer group hover:scale-105"
+                onClick={() => {
+                  navigate("/profile");
+                  setIsCollapsed(true);
+                }}
+              >
+                <User className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                <span className="font-medium text-foreground">My Profile</span>
               </div>
             )}
           </div>
@@ -135,7 +190,7 @@ const   Sidebar = () => {
                   className="w-full justify-start gap-3 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all duration-200 group"
                   onClick={() => {
                     navigate(item.path);
-                    setIsCollapsed(true); // Close sidebar on mobile after navigation
+                    setIsCollapsed(true); // Close sidebar after navigation
                   }}
                 >
                   <item.icon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
@@ -177,10 +232,10 @@ const   Sidebar = () => {
         </div>
       )}
 
-      {/* Overlay */}
+      {/* Overlay - Now works on all screen sizes */}
       {!isCollapsed && (
         <div
-          className="fixed inset-0 bg-black/50 z-30 lg:hidden transition-opacity duration-300 backdrop-blur-sm"
+          className="fixed inset-0 bg-black/20 z-30 transition-opacity duration-300"
           onClick={() => setIsCollapsed(true)}
         />
       )}

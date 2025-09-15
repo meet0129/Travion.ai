@@ -41,6 +41,15 @@ const PopularTrips = () => {
       image: himalayasImage,
       country: "HIMALAYAS",
       countryColor: "#3B82F6"
+    },
+    {
+      title: "Himalayan Adventure: Mountains and Monasteries",
+      description: "Trek through breathtaking landscapes, visit ancient monasteries, and experience Himalayan serenity.",
+      duration: "10 Days",
+      locations: "6 Locations",
+      image: himalayasImage,
+      country: "HIMALAYAS",
+      countryColor: "#3B82F6"
     }
   ];
 

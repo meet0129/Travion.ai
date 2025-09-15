@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import Chat from "./pages/Chat";
 import Preferences from "./pages/Preferences";
 import Destinations from "./pages/Destinations";
+import Profile from "./pages/Profile";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import NotFound from "./pages/NotFound";
@@ -41,6 +42,11 @@ const App = () => (
               <Route path="/destinations" element={
                 <ProtectedRoute>
                   <Destinations />
+                </ProtectedRoute>
+              } />
+              <Route path="/profile" element={
+                <ProtectedRoute>
+                  <Profile />
                 </ProtectedRoute>
               } />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
