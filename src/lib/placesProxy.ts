@@ -26,4 +26,22 @@ export async function callPlacesProxy<T = any>(payload: ProxyRequest): Promise<T
   return (json?.data ?? json) as T;
 }
 
+// Weather proxy
+export async function callWeatherProxy(params: { latitude: number; longitude: number }): Promise<any> {
+  const base = import.meta.env.VITE_FIREBASE_FUNCTIONS_URL as string | undefined;
+  if (!base) throw new Error('VITE_FIREBASE_FUNCTIONS_URL is not configured');
+  const url = `${base.replace(/\/$/, '')}/weather`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`weather proxy failed: ${res.status} ${text}`);
+  }
+  const json = await res.json().catch(() => ({}));
+  return (json?.data ?? json);
+}
+
 

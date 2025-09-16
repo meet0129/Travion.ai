@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { fetchAllCategoriesForDestination, PlaceItem, geocodeDestination, nearbyByCategory } from '../database/googlePlaces';
 import { Heart, ChevronRight, Info } from 'lucide-react';
+import PlaceDetailDialog from './PlaceDetailDialog';
 
 type Props = {
   destination: string;
@@ -81,6 +82,7 @@ const PreferencesWidget = ({ destination, onComplete }: Props) => {
   };
 
   const items = useMemo(() => data[active] || [], [data, active]);
+  const [openPlace, setOpenPlace] = useState<PlaceItem | null>(null);
 
   const toggle = (id: string) => {
     const newPicked = picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id];
@@ -158,7 +160,7 @@ const PreferencesWidget = ({ destination, onComplete }: Props) => {
                       : 'border-slate-200 dark:border-slate-700 hover:border-pink-300 dark:hover:border-pink-600'
                   }`}
                   style={{ animationDelay: `${index * 100}ms` }}
-                  onClick={() => toggle(place.id)}
+                  onClick={() => setOpenPlace(place)}
                 >
                   {/* Image Container */}
                   <div className="relative w-full h-36 bg-slate-100 dark:bg-slate-700">
@@ -178,7 +180,11 @@ const PreferencesWidget = ({ destination, onComplete }: Props) => {
                     )}
                     
                     {/* Heart Selection Icon */}
-                    <div className="absolute top-2 right-2">
+                    <button
+                      className="absolute top-2 right-2"
+                      onClick={(e) => { e.stopPropagation(); toggle(place.id); }}
+                      aria-label={picked.includes(place.id) ? 'Unsave' : 'Save'}
+                    >
                       <Heart 
                         className={`w-5 h-5 transition-all duration-300 ${
                           picked.includes(place.id)
@@ -186,10 +192,10 @@ const PreferencesWidget = ({ destination, onComplete }: Props) => {
                             : 'text-white/80 hover:text-pink-300 hover:scale-110'
                         }`}
                       />
-                    </div>
+                    </button>
                     
                     {/* Info Icon */}
-                    <div className="absolute bottom-2 right-2">
+                    <div className="absolute bottom-2 right-2 pointer-events-none">
                       <div className="w-6 h-6 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-full flex items-center justify-center">
                         <Info className="w-3 h-3 text-slate-600 dark:text-slate-300" />
                       </div>
@@ -263,6 +269,14 @@ const PreferencesWidget = ({ destination, onComplete }: Props) => {
           </div>
         </div>
       </div>
+
+      {openPlace && apiKey && (
+        <PlaceDetailDialog
+          place={openPlace}
+          apiKey={apiKey}
+          onClose={() => setOpenPlace(null)}
+        />
+      )}
     </div>
   );
 };

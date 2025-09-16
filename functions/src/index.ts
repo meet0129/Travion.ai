@@ -9,6 +9,10 @@ setGlobalOptions({ maxInstances: 10 });
 const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_MAPS_API_KEY || "AIzaSyB2edIgTwFyiMxeMdwToxZHJWPSy4qhsjM";
 const GOOGLE_PLACES_BASE_URL = "https://maps.googleapis.com/maps/api/place";
 
+// Google Weather (fallback to Open-Meteo if key/endpoint not available)
+const GOOGLE_WEATHER_API_KEY = process.env.GOOGLE_WEATHER_API_KEY || "";
+const GOOGLE_WEATHER_BASE_URL = "https://weather.googleapis.com/v1";
+
 // CORS headers
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -144,6 +148,54 @@ export const places = onRequest(async (req, res) => {
 
   } catch (error) {
     logger.error("Places function error:", error);
+    res.status(500).json({ 
+      error: "Internal server error", 
+      message: error instanceof Error ? error.message : "Unknown error" 
+    });
+  }
+});
+
+// Weather function: accepts { latitude, longitude } and proxies to Google Weather API
+export const weather = onRequest(async (req, res) => {
+  try {
+    logger.info("Weather function called", {method: req.method, body: req.body});
+
+    // Handle CORS
+    if (handleCors(req, res)) {
+      return;
+    }
+
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "Method not allowed. Use POST." });
+      return;
+    }
+
+    const { latitude, longitude } = req.body || {};
+    if (typeof latitude !== "number" || typeof longitude !== "number") {
+      res.status(400).json({ error: "Missing or invalid latitude/longitude" });
+      return;
+    }
+
+    if (!GOOGLE_WEATHER_API_KEY) {
+      res.status(500).json({ error: "Weather API key not configured" });
+      return;
+    }
+
+    // Google Weather: timeline for current+forecast
+    const url = new URL(`${GOOGLE_WEATHER_BASE_URL}/forecast`);
+    url.searchParams.set("location", `${latitude},${longitude}`);
+    url.searchParams.set("key", GOOGLE_WEATHER_API_KEY);
+    url.searchParams.set("hourly", "temperature_2m,precipitation_probability,relative_humidity_2m,weather_code,wind_speed_10m");
+    url.searchParams.set("daily", "temperature_2m_max,temperature_2m_min,precipitation_sum");
+
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      throw new Error(`Weather API error: ${response.status} ${response.statusText}`);
+    }
+    const data = await response.json();
+    res.json({ data });
+  } catch (error) {
+    logger.error("Weather function error:", error);
     res.status(500).json({ 
       error: "Internal server error", 
       message: error instanceof Error ? error.message : "Unknown error" 
