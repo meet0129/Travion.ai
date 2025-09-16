@@ -30,7 +30,7 @@ const UserProfile = () => {
 
   return (
     <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-primary/10 transition-all duration-200 cursor-pointer group hover:scale-105">
-      <div className="w-8 h-8 rounded-full bg-gradient-to-r from-primary/20 to-primary/30 flex items-center justify-center group-hover:rotate-12 transition-transform duration-300">
+      <div className="w-8 h-8 rounded-full bg-gradient-to-r from-primary/20 to-primary/30 flex items-center justify-center group-hover:rotate-12 transition-transform duration-300 overflow-hidden">
         {currentUser.photoURL ? (
           <img 
             src={currentUser.photoURL} 
@@ -38,8 +38,23 @@ const UserProfile = () => {
             className="w-full h-full rounded-full object-cover"
           />
         ) : (
-          <User className="w-4 h-4 text-primary" />
+          <img
+            src="/src/assets/default-avatar.svg" 
+            alt="Default Profile" 
+            className="w-full h-full rounded-full object-cover"
+            onError={(e) => {
+              // Fallback to icon if default image fails to load
+              e.currentTarget.style.display = 'none';
+              const nextElement = e.currentTarget.nextElementSibling as HTMLElement;
+              if (nextElement) {
+                nextElement.style.display = 'flex';
+              }
+            }}
+          />
         )}
+        <div className="w-full h-full rounded-full bg-gradient-to-r from-primary/20 to-primary/30 flex items-center justify-center" style={{ display: currentUser.photoURL ? 'none' : 'flex' }}>
+          <User className="w-4 h-4 text-primary" />
+        </div>
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors duration-200 truncate">

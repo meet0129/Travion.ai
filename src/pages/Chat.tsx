@@ -1,113 +1,94 @@
-import { Button } from "@/components/ui/button";
-import { ArrowRight, ChevronDown, ChevronUp, Heart } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import Sidebar from "@/components/Sidebar";
+import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { AlertCircle, Bot, User as UserIcon, ThumbsUp, ThumbsDown, RotateCcw, Send } from 'lucide-react';
+import userAvatar from '../assets/default-avatar.svg';
+import Sidebar from '../components/Sidebar';
+import { initializeGemini, sendMessageToGemini, geminiService } from '../lib/gemini';
+import PreferencesWidget from '../components/PreferencesWidget';
 
 const Chat = () => {
   const navigate = useNavigate();
-  const [messages, setMessages] = useState([
-    {
-      type: "ai",
-      content: "I'm Airial, your personal AI travel agent. Simply describe your trip and I will create a fully personalized dream vacation for you planned to the last detail - flights, hotels and day-by-day plans.\n\nYour perfect vacation is seconds away — what's on your mind?",
-      timestamp: new Date()
-    }
-  ]);
+  const [messages, setMessages] = useState([]);
 
   const [newMessage, setNewMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [isGeminiInitialized, setIsGeminiInitialized] = useState(false);
+  const [error, setError] = useState(null);
   const [isVibeExpanded, setIsVibeExpanded] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [preferencesShown, setPreferencesShown] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedExperiences, setSelectedExperiences] = useState([]);
+  const [hasUserInteracted, setHasUserInteracted] = useState(false);
+  const messagesEndRef = useRef(null);
 
-  // Trip data collection - shared with other components
-  const [tripData, setTripData] = useState({
+  // Utilities: normalize natural date strings and compute duration
+  const normalizeDateString = (value) => {
+    if (!value) return '';
+    const months = { jan:'01', feb:'02', mar:'03', apr:'04', may:'05', jun:'06', jul:'07', aug:'08', sep:'09', oct:'10', nov:'11', dec:'12' };
+    const parts = value.toLowerCase().replace(/(st|nd|rd|th)/g, '').trim().split(/\s+/);
+    if (parts.length < 2) return '';
+    const day = parts[0].padStart(2, '0');
+    const month = months[parts[1].slice(0,3)] || '';
+    const year = parts[2] || String(new Date().getFullYear());
+    if (!month) return '';
+    return `${year}-${month}-${day}`;
+  };
+
+  const computeDurationFromDates = (start, end) => {
+    const s = normalizeDateString(start);
+    const e = normalizeDateString(end);
+    if (!s || !e) return '';
+    const sd = new Date(s);
+    const ed = new Date(e);
+    if (isNaN(sd.getTime()) || isNaN(ed.getTime())) return '';
+    const ms = Math.max(ed.getTime() - sd.getTime(), 0);
+    const days = Math.ceil(ms / (1000 * 60 * 60 * 24)) || 0;
+    return `${days} days`;
+  };
+
+  // Simplified trip context - only essential info
+  const [tripContext, setTripContext] = useState({
     destination: '',
-    from: '',
+    startLocation: '',
+    startDate: '',
+    endDate: '',
     duration: '',
-    travelTime: '',
-    travelers: 1,
-    preferences: []
+    travelers: 0,
+    isComplete: false
   });
 
-  // Questions flow for progressive data collection
-  const questions = [
-    {
-      trigger: ['destination', 'go', 'visit', 'trip', 'travel', 'manali', 'goa', 'kerala'],
-      response: (userInput) => {
-        const destination = extractDestination(userInput);
-        setTripData(prev => ({ ...prev, destination }));
-        return `${destination} sounds amazing! Where will you be traveling from?`;
+  // Initialize Gemini on component mount
+  useEffect(() => {
+    const initGemini = async () => {
+      try {
+        const initialized = await initializeGemini();
+        setIsGeminiInitialized(initialized);
+        if (!initialized) {
+          setError('Gemini API is not configured. Please add your API key to the .env file.');
+        }
+        if (initialized) {
+          // Load persisted context if any
+          try {
+            const persisted = sessionStorage.getItem('tripContext');
+            if (persisted) {
+              setTripContext(JSON.parse(persisted));
+            }
+          } catch {}
+
+          // Show model's initial greeting as first message
+          const greeting = geminiService.getInitialGreeting();
+          setMessages([{ type: 'ai', content: greeting, timestamp: new Date() }]);
+        }
+      } catch (error) {
+        console.error('Failed to initialize Gemini:', error);
+        setError('Failed to initialize AI service. Please try again.');
       }
-    },
-    {
-      trigger: ['from', 'starting', 'ahmedabad', 'mumbai', 'delhi', 'bangalore'],
-      response: (userInput) => {
-        const from = extractLocation(userInput);
-        setTripData(prev => ({ ...prev, from }));
-        return `Perfect! How many days are you planning to stay?`;
-      }
-    },
-    {
-      trigger: ['days', 'day', 'week', 'month', '5', '7', '10'],
-      response: (userInput) => {
-        const duration = extractDuration(userInput);
-        setTripData(prev => ({ ...prev, duration }));
-        return `Great! When are you planning to travel?`;
-      }
-    },
-    {
-      trigger: ['when', 'october', 'november', 'december', 'january', 'february'],
-      response: (userInput) => {
-        const travelTime = extractTravelTime(userInput);
-        setTripData(prev => ({ ...prev, travelTime }));
-        return `Excellent timing! How many people will be traveling?`;
-      }
-    },
-    {
-      trigger: ['people', 'person', 'travelers', 'members', '1', '2', '3', '4'],
-      response: (userInput) => {
-        const travelers = extractTravelers(userInput);
-        setTripData(prev => ({ ...prev, travelers }));
-        return `Perfect! Based on your ${tripData.destination || 'destination'} trip details, let me show you some amazing experiences to choose from. I'll create a personalized selection for you!`;
-      }
-    }
-  ];
+    };
 
-  // Helper functions to extract information from user messages
-  const extractDestination = (text) => {
-    const destinations = ['manali', 'goa', 'kerala', 'rajasthan', 'himachal', 'ladakh', 'shimla'];
-    const found = destinations.find(dest => text.toLowerCase().includes(dest));
-    return found ? found.charAt(0).toUpperCase() + found.slice(1) : 'your destination';
-  };
+    initGemini();
+  }, []);
 
-  const extractLocation = (text) => {
-    const locations = ['ahmedabad', 'mumbai', 'delhi', 'bangalore', 'pune', 'hyderabad', 'chennai'];
-    const found = locations.find(loc => text.toLowerCase().includes(loc));
-    return found ? found.charAt(0).toUpperCase() + found.slice(1) : 'your location';
-  };
-
-  const extractDuration = (text) => {
-    const match = text.match(/(\d+)\s*(day|week)/i);
-    if (match) {
-      return `${match[1]} ${match[2]}${match[1] > 1 ? 's' : ''}`;
-    }
-    const numberMatch = text.match(/(\d+)/);
-    return numberMatch ? `${numberMatch[1]} days` : '5 days';
-  };
-
-  const extractTravelTime = (text) => {
-    const months = ['january', 'february', 'march', 'april', 'may', 'june', 
-                   'july', 'august', 'september', 'october', 'november', 'december'];
-    const found = months.find(month => text.toLowerCase().includes(month));
-    return found ? found.charAt(0).toUpperCase() + found.slice(1) : 'October';
-  };
-
-  const extractTravelers = (text) => {
-    const match = text.match(/(\d+)/);
-    return match ? parseInt(match[1]) : 1;
-  };
-
+  // Auto-scroll to bottom with smooth animation
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -116,123 +97,262 @@ const Chat = () => {
     scrollToBottom();
   }, [messages]);
 
-  const processMessage = (message) => {
-    const lowerMessage = message.toLowerCase();
-    
-    // Check if we should show preferences after collecting all data
-    if (currentQuestion >= questions.length - 1 && !isVibeExpanded) {
-      setTimeout(() => {
-        setIsVibeExpanded(true);
-      }, 1000);
-      return;
-    }
+  // Extract trip information from message
+  const extractTripInfo = (message, currentContext) => {
+    const newContext = { ...currentContext };
+    const lowerMessage = message.toLowerCase().trim();
 
-    // Process based on current question in the flow
-    const question = questions[currentQuestion];
-    if (question && question.trigger.some(trigger => lowerMessage.includes(trigger))) {
-      const response = question.response(message);
-      setCurrentQuestion(prev => prev + 1);
-      return response;
-    }
-
-    // Default responses for unmatched messages
-    const defaultResponses = [
-      "That's interesting! Could you tell me more about your travel plans?",
-      "I'd love to help you plan the perfect trip. What destination do you have in mind?",
-      "Great! Let's start planning your adventure. Where would you like to go?"
+    // Extract destination
+    const indianDestinations = [
+      'goa', 'kerala', 'rajasthan', 'mumbai', 'delhi', 'bangalore', 'chennai',
+      'kolkata', 'jaipur', 'udaipur', 'jodhpur', 'agra', 'varanasi', 'rishikesh',
+      'manali', 'shimla', 'darjeeling', 'ooty', 'kodaikanal', 'munnar', 'alleppey',
+      'kochi', 'mysore', 'hampi'
     ];
-    
-    return defaultResponses[Math.floor(Math.random() * defaultResponses.length)];
+
+    for (const dest of indianDestinations) {
+      if (lowerMessage.includes(dest)) {
+        newContext.destination = dest.charAt(0).toUpperCase() + dest.slice(1);
+        break;
+      }
+    }
+
+    // Extract start location
+    const indianCities = [
+      'mumbai', 'delhi', 'bangalore', 'chennai', 'kolkata', 'hyderabad', 'pune',
+      'ahmedabad', 'jaipur', 'surat', 'lucknow', 'kochi', 'chandigarh'
+    ];
+
+    for (const city of indianCities) {
+      if (lowerMessage.includes(`from ${city}`)) {
+        newContext.startLocation = city.charAt(0).toUpperCase() + city.slice(1);
+        break;
+      }
+    }
+
+    // Extract dates and duration
+    const dateMatch = message.match(/(\d{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*(?:\s+\d{4})?)/gi);
+    if (dateMatch) {
+      if (!newContext.startDate) {
+        newContext.startDate = dateMatch[0];
+        if (dateMatch[1]) {
+          newContext.endDate = dateMatch[1];
+        }
+      }
+    }
+
+    const durationMatch = message.match(/(\d+)\s*(?:days?|weeks?|months?)/i);
+    if (durationMatch) {
+      const num = parseInt(durationMatch[1]);
+      if (durationMatch[0].includes('week')) {
+        newContext.duration = `${num * 7} days`;
+      } else if (durationMatch[0].includes('month')) {
+        newContext.duration = `${num * 30} days`;
+      } else {
+        newContext.duration = `${num} days`;
+      }
+    }
+
+    // Extract number of travelers
+    const travelerMatch = message.match(/(\d+)\s*(?:people|persons?|travelers?|friends?|family\s*members?)/i);
+    if (travelerMatch) {
+      newContext.travelers = parseInt(travelerMatch[1]);
+    } else if (lowerMessage.includes('solo') || lowerMessage.includes('alone') || lowerMessage.includes('just me')) {
+      newContext.travelers = 1;
+    } else if (lowerMessage.includes('couple') || lowerMessage.includes('two of us')) {
+      newContext.travelers = 2;
+    }
+  
+    // Persist on every extraction
+    try {
+      sessionStorage.setItem('tripContext', JSON.stringify(newContext));
+    } catch {}
+
+    return newContext;
   };
 
-  const handleSendMessage = () => {
-    if (newMessage.trim()) {
-      const userMessage = { type: "user", content: newMessage, timestamp: new Date() };
-      setMessages(prev => [...prev, userMessage]);
-      
-      const messageContent = newMessage;
-      setNewMessage("");
-      setIsTyping(true);
-      
-      setTimeout(() => {
-        const aiResponse = processMessage(messageContent);
-        if (aiResponse) {
-          setMessages(prev => [...prev, { 
-            type: "ai", 
-            content: aiResponse,
-            timestamp: new Date()
-          }]);
+  // Process message and handle conversation flow
+  const processMessage = async (message) => {
+    if (!isGeminiInitialized) {
+      throw new Error('Gemini AI is not initialized');
+    }
+
+    try {
+      // Send message to Gemini and get response
+      const aiResponse = await sendMessageToGemini(message, tripContext);
+
+      // Extract information from user's message
+      const updatedContext = extractTripInfo(message, tripContext);
+      setTripContext(updatedContext);
+
+      // If Gemini indicates all information is collected, show preferences after the response
+      if (aiResponse.toLowerCase().includes("let's move on to your travel preferences")) {
+        updatedContext.isComplete = true;
+        setTripContext(updatedContext);
+       
+        try { sessionStorage.setItem('tripContext', JSON.stringify(updatedContext)); } catch {}
+        
+        // Ensure duration is computed if dates are present
+        if (!updatedContext.duration && updatedContext.startDate && updatedContext.endDate) {
+          const computed = computeDurationFromDates(updatedContext.startDate, updatedContext.endDate);
+          if (computed) {
+            updatedContext.duration = computed;
+            try { sessionStorage.setItem('tripContext', JSON.stringify(updatedContext)); } catch {}
+            setTripContext({ ...updatedContext });
+          }
         }
-        setIsTyping(false);
-      }, 1500);
+
+        // Persist a concise trip plan for later use (destination for API keys, etc.)
+        try {
+          const tripPlan = {
+            destination: updatedContext.destination || '',
+            startLocation: updatedContext.startLocation || '',
+            startDate: updatedContext.startDate || '',
+            endDate: updatedContext.endDate || '',
+            duration: updatedContext.duration || '',
+            travelers: updatedContext.travelers || 0,
+            createdAt: new Date().toISOString()
+          };
+          sessionStorage.setItem('tripPlan', JSON.stringify(tripPlan));
+        } catch {}
+
+        // Set flag to show preferences after the AI response is displayed
+        setTimeout(() => {
+          setPreferencesShown(true);
+        }, 2000); // Wait 2 seconds after the AI response appears
+      }
+
+      return aiResponse;
+    } catch (error) {
+      console.error('Error processing message:', error);
+      throw error;
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !isGeminiInitialized) return;
+
+    const userMessage = { type: "user", content: newMessage, timestamp: new Date() };
+    setMessages(prev => [...prev, userMessage]);
+
+    const messageContent = newMessage;
+    setNewMessage("");
+    setIsTyping(true);
+    setError(null);
+    setHasUserInteracted(true);
+
+    try {
+      const aiResponse = await processMessage(messageContent);
+      setTimeout(() => {
+        setMessages(prev => [...prev, {
+          type: "ai",
+          content: aiResponse,
+          timestamp: new Date()
+        }]);
+        setIsTyping(false);
+      }, 800);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setError(error instanceof Error ? error.message : 'An error occurred while processing your message');
+
+      setTimeout(() => {
+        setMessages(prev => [...prev, {
+          type: "ai",
+          content: "Oops! Something went wrong on my end. Mind giving that another shot? 🔄",
+          timestamp: new Date()
+        }]);
+        setIsTyping(false);
+      }, 500);
+    }
+  };
+
+  const handleKeyPress = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
   };
 
-  const handleExpandVibe = () => {
-    setIsVibeExpanded(true);
-  };
+  // Handle completion of preferences selection
+  const handlePreferencesComplete = (pickedIds: string[]) => {
+    const tripData = {
+      destination: tripContext.destination,
+      from: tripContext.startLocation,
+      startDate: tripContext.startDate,
+      endDate: tripContext.endDate,
+      duration: tripContext.duration,
+      travelers: tripContext.travelers,
+      preferences: pickedIds
+    };
 
-  const handlePreferencesComplete = () => {
-    // Store trip data in localStorage for other components to access
-    localStorage.setItem('tripData', JSON.stringify(tripData));
-    
+    try {
+      sessionStorage.setItem('tripData', JSON.stringify(tripData));
+    } catch (e) {
+      console.log('SessionStorage not available');
+    }
+
     setMessages(prev => [...prev, 
-      { type: "user", content: "I've selected my preferences!", timestamp: new Date() },
+      { type: "user", content: "Perfect! I've selected my preferences!", timestamp: new Date() },
       { 
         type: "ai", 
-        content: "Excellent choices! Based on your preferences, I've curated the perfect destinations for your trip. Let me show you the itinerary.", 
+        content: `🚀 Incredible! Your personalized ${tripContext.destination} adventure is taking shape! I'm crafting something amazing with your ${pickedIds.length} handpicked experiences. Ready to explore? Let's make this happen! 🎉✨`, 
         timestamp: new Date() 
       }
     ]);
-    
-    // Navigate to destinations page
+
     setTimeout(() => {
       navigate("/destinations");
-    }, 2000);
+    }, 2500);
   };
 
+  // Dummy data generation now moved into PreferencesWidget
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-      <div className="w-full max-w-4xl mx-auto px-4 pt-6">
+    <div className="min-h-screen bg-white dark:bg-slate-950 font-['Inter',sans-serif]">
+      <div className="w-full max-w-3xl mx-auto px-4 pt-6">
         <Sidebar />
-        
-        {/* Chat Messages */}
-        <div className="space-y-6 mb-8">
+
+        {error && (
+          <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-3 animate-in slide-in-from-top-4 duration-300">
+            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+            <div className="text-red-700 dark:text-red-300 text-sm font-medium">{error}</div>
+          </div>
+        )}
+
+        <div className="space-y-8 mb-28">
           {messages.map((message, index) => (
-            <div key={index}>
+            <div
+              key={index}
+              className={`flex items-start gap-3`}
+            >
               {message.type === 'ai' ? (
-                <div className="flex gap-3 items-start">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-blue-600 flex items-center justify-center flex-shrink-0">
-                    <span className="text-white text-sm font-bold">A</span>
+                <div className="flex items-start gap-3 max-w-[92%]">
+                  <div className="h-8 w-8 rounded-full bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center flex-shrink-0">
+                    <Bot className="h-4 w-4 text-violet-600 dark:text-violet-300" />
                   </div>
                   <div className="flex-1">
-                    <div className="mb-1">
-                      <span className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Airial</span>
+                    <div className="text-xs font-semibold text-violet-700 dark:text-violet-300 mb-1">Travion.ai</div>
+                    <div className="rounded-none border-0 bg-transparent p-0">
+                      <div className="prose dark:prose-invert max-w-none">
+                        <div dangerouslySetInnerHTML={{ __html: message.content.replace(/\n/g, '<br>') }} />
+                      </div>
                     </div>
-                    <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border border-slate-200 dark:border-slate-700 rounded-2xl p-4 shadow-sm">
-                      <p className="text-slate-900 dark:text-slate-100 text-sm leading-relaxed whitespace-pre-line">
-                        {message.content}
-                      </p>
+                    <div className="mt-2 flex items-center gap-3">
+                      <div className="hidden sm:flex items-center gap-1 text-slate-400 dark:text-slate-500">
+                        <button className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800" title="Good response" aria-label="Good response"><ThumbsUp className="h-4 w-4" /></button>
+                        <button className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800" title="Bad response" aria-label="Bad response"><ThumbsDown className="h-4 w-4" /></button>
+                        <button className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800" title="Undo" aria-label="Undo"><RotateCcw className="h-4 w-4" /></button>
+                      </div>
                     </div>
                   </div>
                 </div>
               ) : (
-                <div className="flex gap-3 items-start">
-                  <div className="w-8 h-8 rounded-full bg-slate-300 dark:bg-slate-600 flex items-center justify-center flex-shrink-0">
-                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">U</span>
-                  </div>
+                <div className="flex items-start gap-3 max-w-[92%]">
+                  <img src={userAvatar} alt="You" className="h-8 w-8 rounded-full border border-slate-200 dark:border-slate-800 flex-shrink-0" />
                   <div className="flex-1">
-                    <div className="bg-slate-100 dark:bg-slate-700 rounded-2xl px-4 py-3 max-w-xs">
-                      <p className="text-slate-900 dark:text-slate-100 text-sm font-medium">
-                        {message.content}
-                      </p>
+                    <div className="text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">You</div>
+                    <div className="p-0">
+                      <div className="whitespace-pre-wrap text-slate-900 dark:text-slate-100">{message.content}</div>
                     </div>
                   </div>
                 </div>
@@ -240,118 +360,48 @@ const Chat = () => {
             </div>
           ))}
 
-          {/* Vibe Preferences Section - Shows after collecting all trip details */}
-          {isVibeExpanded && (
-            <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border border-slate-200 dark:border-slate-700 rounded-2xl shadow-lg overflow-hidden">
-              <div className="p-4 border-b border-slate-200 dark:border-slate-700">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-300">Select your vibe</h3>
-                  </div>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => setIsVibeExpanded(false)}
-                    className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20"
-                  >
-                    Collapse
-                    <ChevronUp className="w-4 h-4 ml-1" />
-                  </Button>
-                </div>
-                
-                <div className="mt-4">
-                  <h4 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 mb-2">
-                    Pick What You Love 
-                    <Heart className="w-5 h-5 text-red-500 fill-red-500" />
-                  </h4>
-                  <p className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-2">
-                    <Heart className="w-4 h-4 text-red-500 fill-red-500" />
-                    Follow your inspiration — Airial will connect the dots and create a journey filled with moments that feel just right.
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-4 sm:p-6">
-                <div className="text-center py-8">
-                  <p className="text-slate-600 dark:text-slate-400 mb-4">
-                    Based on your {tripData.destination} trip, I'm preparing personalized experiences for you!
-                  </p>
-                  <Button 
-                    onClick={() => navigate("/preferences")}
-                    className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-full px-8 py-3 text-base font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
-                  >
-                    Explore Preferences
-                  </Button>
-                </div>
-              </div>
-            </div>
+          {preferencesShown && tripContext.destination && (
+            <PreferencesWidget
+              destination={tripContext.destination}
+              onComplete={handlePreferencesComplete}
+            />
           )}
 
-          {/* Typing Indicator */}
           {isTyping && (
-            <div className="flex gap-3 items-start">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-blue-600 flex items-center justify-center flex-shrink-0">
-                <span className="text-white text-sm font-bold">A</span>
-              </div>
-              <div className="flex-1">
-                <div className="mb-1">
-                  <span className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Airial</span>
-                </div>
-                <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border border-slate-200 dark:border-slate-700 rounded-2xl p-4 shadow-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                    </div>
-                    <span className="text-slate-600 dark:text-slate-400 text-xs">Thinking...</span>
-                  </div>
-                </div>
+            <div className="flex items-center gap-3">
+              <div className="flex space-x-2 bg-white dark:bg-slate-800 rounded-lg p-3">
+                <div className="w-2 h-2 bg-slate-300 dark:bg-slate-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                <div className="w-2 h-2 bg-slate-300 dark:bg-slate-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                <div className="w-2 h-2 bg-slate-300 dark:bg-slate-600 rounded-full animate-bounce"></div>
               </div>
             </div>
           )}
-          
+
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Enhanced Chat Input */}
         <div className="sticky bottom-0 bg-gradient-to-t from-slate-50 via-slate-50/95 to-transparent dark:from-slate-900 dark:via-slate-900/95 pt-4">
-          <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-lg rounded-2xl shadow-lg overflow-hidden">
-            <div className="flex items-center gap-3 p-4">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-blue-600 flex items-center justify-center flex-shrink-0">
-                <span className="text-white text-sm font-semibold">A</span>
-              </div>
-              <div className="flex-1 flex items-center gap-3">
-                <input 
-                  type="text" 
-                  placeholder="Ask Airial ..."
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  className="flex-1 bg-transparent border-none outline-none text-slate-900 dark:text-slate-100 text-sm placeholder:text-slate-500 dark:placeholder:text-slate-400"
-                />
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="w-8 h-8 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                  >
-                    <ChevronDown className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    onClick={handleSendMessage}
-                    disabled={!newMessage.trim()}
-                    className="w-8 h-8 bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ArrowRight className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
+          <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-lg rounded-2xl shadow-xl overflow-hidden border border-slate-200/50 dark:border-slate-700/50">
+            <div className="flex items-end gap-2 p-4">
+              <textarea
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Type your message..."
+                className="flex-1 bg-transparent border-0 focus:ring-0 resize-none h-10 max-h-40 overflow-auto"
+                style={{ height: "40px" }}
+              />
+              <button
+                onClick={handleSendMessage}
+                disabled={!newMessage.trim() || !isGeminiInitialized}
+                className="bg-blue-500 text-white px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-600 transition-colors"
+              >
+                Send
+              </button>
             </div>
-          </div>
+          </div>  
         </div>
-      </div>
+      </div>    
     </div>
   );
 };
