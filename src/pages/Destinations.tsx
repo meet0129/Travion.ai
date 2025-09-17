@@ -163,56 +163,14 @@ const Destinations = () => {
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950 font-['Inter',sans-serif]">
-      <div className="w-full max-w-7xl mx-auto px-4 pt-6">
+      <div className="w-full max-w-fit mb-0 ml-auto px-4 pt-6">
         <Sidebar />
 
         {/* Chat Messages */}
         <div className="space-y-8 mb-28">
-          {/* AI Messages */}
-          <div className="flex items-start gap-3 max-w-[70%]">
-            <div className="h-8 w-8 rounded-full bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center flex-shrink-0">
-              <Bot className="h-4 w-4 text-violet-600 dark:text-violet-300" />
-            </div>
-            <div className="flex-1">
-              <div className="text-xs font-semibold text-violet-700 dark:text-violet-300 mb-1">Travion.ai</div>
-              <div className="rounded-none border-0 bg-transparent p-0">
-                <div className="prose dark:prose-invert max-w-none">
-                  <div>Perfect choices! Solang Valley's adventure sports, Rohtang's snow-capped beauty, and Old Manali's charm will make for an unforgettable week. Let's now move to selecting destinations and creating your complete trip plan with flights, hotels, and activities for all 5 travelers!</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3 max-w-[70%]">
-            <div className="h-8 w-8 rounded-full bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center flex-shrink-0">
-              <Bot className="h-4 w-4 text-violet-600 dark:text-violet-300" />
-            </div>
-            <div className="flex-1">
-              <div className="text-xs font-semibold text-violet-700 dark:text-violet-300 mb-1">Travion.ai</div>
-              <div className="rounded-none border-0 bg-transparent p-0">
-                <div className="prose dark:prose-invert max-w-none">
-                  <div>For your 7-day trip from Ahmedabad with 5 people, I recommend spending 5 days in Manali and 2 days in nearby Kullu. In Manali, you'll explore your selected spots - Solang Valley for adventure activities, the majestic Rohtang Pass, and charming Old Manali. You'll also visit the ancient Hadimba Temple and enjoy shopping on Mall Road. Kullu offers a change of scenery with its beautiful valleys and the famous Manikaran hot springs.</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3 max-w-[70%]">
-            <div className="h-8 w-8 rounded-full bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center flex-shrink-0">
-              <Bot className="h-4 w-4 text-violet-600 dark:text-violet-300" />
-            </div>
-            <div className="flex-1">
-              <div className="text-xs font-semibold text-violet-700 dark:text-violet-300 mb-1">Travion.ai</div>
-              <div className="rounded-none border-0 bg-transparent p-0">
-                <div className="prose dark:prose-invert max-w-none">
-                  <div>You can confirm these destinations or make changes before I create your detailed itinerary.</div>
-                </div>
-              </div>
-            </div>
-          </div>
 
           {/* AI Response Container - Destinations Layout */}
-          <div className="flex items-start gap-3 max-w-[70%]">
+          <div className="flex items-start gap-3 max-w-[60%]">
             <div className="h-8 w-8 rounded-full bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center flex-shrink-0">
               <Bot className="h-4 w-4 text-violet-600 dark:text-violet-300" />
             </div>
@@ -228,7 +186,7 @@ const Destinations = () => {
                       {/* Header */}
                       <div className="p-6 border-b border-slate-200 dark:border-slate-700">
                         <div className="flex items-center justify-between mb-4">
-                          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
                             Choose Trip Destinations
                           </h1>
                           <div className="flex items-center gap-3">
