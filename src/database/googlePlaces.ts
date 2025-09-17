@@ -151,4 +151,56 @@ export async function fetchAllCategoriesForDestination(destination: string, apiK
   return { attractions, day_trips: dayTrips, food_cafes: foodCafes, hidden_gems: hiddenGems };
 }
 
+// Suggest places similar to a given place. Uses a nearby search around the place
+// location using either its primary type or a keyword derived from its name.
+export async function similarPlacesByPlace(
+  base: PlaceItem,
+  apiKey: string,
+  limit: number = 10
+): Promise<PlaceItem[]> {
+  const keyword = (base.types && base.types.length > 0)
+    ? base.types[0]
+    : base.name?.split(/[\s,\-]/)[0];
+
+  const data: any = await callPlacesProxy({
+    action: 'nearby',
+    latitude: base.location.lat,
+    longitude: base.location.lng,
+    radius: 20000,
+    keyword,
+  });
+
+  const items: PlaceItem[] = (data?.results || []).map((r: any) => ({
+    id: r.place_id,
+    name: r.name,
+    address: r.vicinity || r.formatted_address || '',
+    rating: r.rating,
+    userRatingsTotal: r.user_ratings_total,
+    photoUrl: photoUrl(r.photos?.[0]?.photo_reference, apiKey),
+    priceLevel: r.price_level,
+    types: r.types,
+    location: r.geometry?.location,
+  }));
+
+  // Deduplicate and filter out the base item
+  const unique = new Map<string, PlaceItem>();
+  for (const it of items) {
+    if (it.id !== base.id && !unique.has(it.id)) unique.set(it.id, it);
+  }
+
+  // Quality filter (similar to nearbyByCategory)
+  const filtered = Array.from(unique.values()).filter(p =>
+    !!p.rating && !!p.userRatingsTotal && p.userRatingsTotal >= 5 && !!p.photoUrl && !!p.name && !!p.address
+  );
+
+  // Sort by rating then reviews
+  filtered.sort((a, b) => {
+    const ratingDiff = (b.rating || 0) - (a.rating || 0);
+    if (Math.abs(ratingDiff) > 0.1) return ratingDiff;
+    return (b.userRatingsTotal || 0) - (a.userRatingsTotal || 0);
+  });
+
+  return filtered.slice(0, limit);
+}
+
 

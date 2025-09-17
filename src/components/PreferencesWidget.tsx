@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { fetchAllCategoriesForDestination, PlaceItem, geocodeDestination, nearbyByCategory } from '../database/googlePlaces';
+import { fetchAllCategoriesForDestination, PlaceItem, geocodeDestination, nearbyByCategory, similarPlacesByPlace } from '../database/googlePlaces';
 import { Heart, ChevronRight, Info } from 'lucide-react';
 import PlaceDetailDialog from './PlaceDetailDialog';
 
@@ -28,6 +28,7 @@ const PreferencesWidget = ({ destination, onComplete }: Props) => {
     hidden_gems: []
   });
   const [picked, setPicked] = useState<string[]>([]);
+  const [pickedPlaces, setPickedPlaces] = useState<Record<string, PlaceItem>>({});
   const [showMore, setShowMore] = useState<Record<TabKey, boolean>>({
     attractions: false,
     day_trips: false,
@@ -85,9 +86,13 @@ const PreferencesWidget = ({ destination, onComplete }: Props) => {
   const [openPlace, setOpenPlace] = useState<PlaceItem | null>(null);
 
   const toggle = (id: string) => {
+    const list = data[active] || [];
+    const place = list.find(p => p.id === id);
     const newPicked = picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id];
     setPicked(newPicked);
-    
+    if (place) {
+      setPickedPlaces(prev => ({ ...prev, [place.id]: place }));
+    }
     // Load more places if user has selected preferences and we haven't loaded more yet
     if (newPicked.length > 0 && !showMore[active]) {
       loadMorePlaces(active);
@@ -246,6 +251,32 @@ const PreferencesWidget = ({ destination, onComplete }: Props) => {
           </div>
         )}
 
+        {/* Similar to picked tab */}
+        {picked.length > 0 && (
+          <div className="mt-6">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">More like your picks</div>
+              <button
+                className="text-xs text-purple-600 hover:underline"
+                onClick={async () => {
+                  if (!apiKey) return;
+                  const firstPicked = pickedPlaces[picked[0]];
+                  if (!firstPicked) return;
+                  const similar = await similarPlacesByPlace(firstPicked, apiKey, 10);
+                  // Keep 10 visible at most
+                  setData(prev => ({
+                    ...prev,
+                    [active]: [...similar.slice(0, 10)]
+                  }));
+                  setShowMore(prev => ({ ...prev, [active]: true }));
+                }}
+              >
+                Suggest similar
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Bottom Section */}
         <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
           <div className="flex items-center justify-between">
@@ -255,7 +286,11 @@ const PreferencesWidget = ({ destination, onComplete }: Props) => {
             </div>
             
             <button
-              onClick={() => onComplete(picked)}
+              onClick={() => {
+                const selected = picked.map(id => pickedPlaces[id]).filter(Boolean);
+                localStorage.setItem('selectedPreferences', JSON.stringify(selected));
+                onComplete(picked);
+              }}
               disabled={picked.length === 0}
               className={`flex items-center gap-2 px-6 py-3 rounded-full font-medium transition-all duration-300 ${
                 picked.length > 0

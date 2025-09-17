@@ -6,7 +6,8 @@ import { ArrowRight, X, Plus, Users, Settings, MapPin, Calendar, Clock, Star, He
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "@/components/Sidebar";
-import { fetchAllCategoriesForDestination, PlaceItem } from "@/database/googlePlaces";
+import { fetchAllCategoriesForDestination, PlaceItem, similarPlacesByPlace } from "@/database/googlePlaces";
+import MapEmbed from "@/components/MapEmbed";
 
 const Destinations = () => {
   const navigate = useNavigate();
@@ -27,6 +28,7 @@ const Destinations = () => {
   const [selectedDestinations, setSelectedDestinations] = useState<PlaceItem[]>([]);
   const [suggestedDestinations, setSuggestedDestinations] = useState<PlaceItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 
@@ -123,17 +125,51 @@ const Destinations = () => {
     }
   };
 
-  // Generate map URL with all selected destinations
-  const mapUrl = useMemo(() => {
-    if (selectedDestinations.length === 0) return '';
-    
-    const center = selectedDestinations[0];
-    const markers = selectedDestinations.map(dest => 
-      `${dest.location.lat},${dest.location.lng}`
-    ).join('|');
-    
-    return `https://www.google.com/maps/embed/v1/view?key=${apiKey}&center=${center.location.lat},${center.location.lng}&zoom=10&markers=${markers}`;
-  }, [selectedDestinations, apiKey]);
+  // Pins for JS map
+  const pins = useMemo(() => selectedDestinations.map(d => ({ id: d.id, name: d.name, location: d.location })), [selectedDestinations]);
+  const allPins = useMemo(() => {
+    const base = [...selectedDestinations, ...(showSuggestions ? suggestedDestinations : [])];
+    const map = new Map<string, PlaceItem>();
+    base.forEach(p => { if (!map.has(p.id)) map.set(p.id, p); });
+    return Array.from(map.values()).map(d => ({ id: d.id, name: d.name, location: d.location }));
+  }, [selectedDestinations, suggestedDestinations, showSuggestions]);
+
+  const loadSuggestions = async (count: number) => {
+    if (!apiKey) return;
+    const suggestions = await fetchAllCategoriesForDestination(tripData.destination, apiKey, Math.max(count, 6));
+    const pool = [
+      ...suggestions.attractions,
+      ...suggestions.day_trips,
+      ...suggestions.hidden_gems,
+      ...suggestions.food_cafes,
+    ];
+    // Dedup and exclude already selected
+    const selectedIds = new Set(selectedDestinations.map(d => d.id));
+    const unique: PlaceItem[] = [];
+    const seen = new Set<string>();
+    for (const p of pool) {
+      if (!selectedIds.has(p.id) && !seen.has(p.id)) {
+        seen.add(p.id);
+        unique.push(p);
+      }
+      if (unique.length >= count) break;
+    }
+    setSuggestedDestinations(unique);
+  };
+
+  const replenishWithSimilar = async (base: PlaceItem) => {
+    if (!apiKey) return;
+    const need = Math.max(0, 10 - suggestedDestinations.length);
+    if (need === 0) return;
+    const similar = await similarPlacesByPlace(base, apiKey, 15);
+    const existing = new Set<string>([...selectedDestinations, ...suggestedDestinations].map(p => p.id));
+    const next: PlaceItem[] = [];
+    for (const p of similar) {
+      if (!existing.has(p.id)) next.push(p);
+      if (next.length >= need) break;
+    }
+    setSuggestedDestinations(prev => [...prev, ...next].slice(0, 10));
+  };
 
   const handleSendMessage = () => {
     if (inputValue.trim()) {
@@ -163,30 +199,30 @@ const Destinations = () => {
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950 font-['Inter',sans-serif]">
-      <div className="w-full max-w-fit mb-0 ml-auto px-4 pt-6">
+      <div className="w-full max-w-[1040px] mx-auto px-5 pt-5 pr-7">
         <Sidebar />
 
         {/* Chat Messages */}
         <div className="space-y-8 mb-28">
 
           {/* AI Response Container - Destinations Layout */}
-          <div className="flex items-start gap-3 max-w-[60%]">
+          <div className="flex items-start gap-3 w-full">
             <div className="h-8 w-8 rounded-full bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center flex-shrink-0">
               <Bot className="h-4 w-4 text-violet-600 dark:text-violet-300" />
             </div>
             <div className="flex-1">
               <div className="text-xs font-semibold text-violet-700 dark:text-violet-300 mb-1">Travion.ai</div>
-              <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-lg rounded-2xl shadow-xl border border-slate-200/50 dark:border-slate-700/50 overflow-hidden">
+              <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-lg rounded-2xl shadow-xl border border-slate-200/50 dark:border-slate-700/50 overflow-hidden w-full">
                 {/* Main Content - Split Layout */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-6">
+                <div className="grid grid-cols-1 lg:grid-cols-[1.06fr,1fr] gap-5 p-5" style={{ maxHeight: 'calc(100vh - 200px)' }}>
                   {/* Left Side - Destinations */}
-                  <div className="space-y-6">
+                  <div className="space-y-6 overflow-y-auto pr-2" style={{ maxHeight: 'calc(100vh - 260px)' }}>
                     {/* Destinations Widget */}
                     <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-lg rounded-2xl shadow-xl border border-slate-200/50 dark:border-slate-700/50 overflow-hidden">
                       {/* Header */}
-                      <div className="p-6 border-b border-slate-200 dark:border-slate-700">
+                      <div className="p-5 border-b border-slate-200 dark:border-slate-700">
                         <div className="flex items-center justify-between mb-4">
-                          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+                          <h1 className="text-[22px] md:text-[26px] font-bold tracking-tight text-slate-900 dark:text-slate-100">
                             Choose Trip Destinations
                           </h1>
                           <div className="flex items-center gap-3">
@@ -201,13 +237,13 @@ const Destinations = () => {
                             </Button>
                           </div>
                         </div>
-                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                        <p className="text-[13px] md:text-sm text-slate-600 dark:text-slate-400">
                           Pick all the places where you will spend at least one night
                         </p>
                       </div>
 
                       {/* Content */}
-                      <div className="p-6">
+                      <div className="p-5">
                         {/* Start/End Inputs */}
                         <div className="grid grid-cols-2 gap-4 mb-6">
                           <div className="space-y-2">
@@ -237,15 +273,15 @@ const Destinations = () => {
                         {/* Chosen Destinations */}
                         <div className="mb-6">
                           <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                            <h3 className="text-[16px] md:text-[18px] font-semibold text-slate-900 dark:text-slate-100">
                               Chosen Destinations ({selectedDestinations.length})
                             </h3>
                           </div>
                           
-                          <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                          <p className="text-[13px] text-slate-600 dark:text-slate-400 mb-4">
                             Chosen by Airial based on the conversation.
                           </p>
-                          <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                          <p className="text-[13px] text-slate-600 dark:text-slate-400 mb-4">
                             You can <span className="text-blue-600 cursor-pointer">Add to</span>, <span className="text-blue-600 cursor-pointer">Remove from</span>, or <span className="text-blue-600 cursor-pointer">Reorder</span> this list
                           </p>
 
@@ -254,10 +290,10 @@ const Destinations = () => {
                               <Card key={destination.id} className="p-4 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 hover:shadow-sm transition-shadow">
                                 <div className="flex items-center gap-4">
                                   <div className="relative flex-shrink-0">
-                                    <img 
+                              <img 
                                       src={destination.photoUrl || "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=80&h=60&fit=crop&q=80"}
                                       alt={destination.name}
-                                      className="w-16 h-12 rounded-lg object-cover"
+                                className="w-20 h-14 rounded-lg object-cover"
                                     />
                                   </div>
                                   
@@ -285,10 +321,11 @@ const Destinations = () => {
                             ))}
                           </div>
 
-                          <Button 
-                            variant="outline" 
-                            className="w-full mt-4 flex items-center justify-center gap-2 h-10 rounded-lg border-2 border-dashed border-purple-300 dark:border-purple-600 hover:border-purple-400 dark:hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/10 transition-colors bg-white dark:bg-slate-800"
-                          >
+                <Button 
+                  variant="outline" 
+                  onClick={async () => { setShowSuggestions(true); if (suggestedDestinations.length === 0) { await loadSuggestions(5); } }}
+                  className="w-full mt-4 flex items-center justify-center gap-2 h-10 rounded-lg border-2 border-dashed border-purple-300 dark:border-purple-600 hover:border-purple-400 dark:hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/10 transition-colors bg-white dark:bg-slate-800"
+                >
                             <Plus className="w-4 h-4 text-purple-600" />
                             Add Another Destination
                           </Button>
@@ -296,6 +333,34 @@ const Destinations = () => {
                           <p className="text-xs text-center text-purple-600 dark:text-purple-400 mt-2">
                             ({suggestedDestinations.length} Suggestions)
                           </p>
+
+                {/* Suggestions bar */}
+                {showSuggestions && suggestedDestinations.length > 0 && (
+                  <div className="mt-4">
+                    <div className="text-xs font-medium text-slate-500 mb-2">Suggestions for you</div>
+                    <div className="flex gap-3 overflow-x-auto pb-2">
+                      {suggestedDestinations.map((s) => (
+                        <div
+                          key={s.id}
+                          title={s.name}
+                          className="flex-shrink-0 w-60 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 shadow-sm hover:shadow-md transition cursor-pointer"
+                          onClick={async () => {
+                            addDestination(s);
+                            // remove from suggestions and replenish up to 10
+                            setSuggestedDestinations(prev => prev.filter(p => p.id !== s.id));
+                            await replenishWithSimilar(s);
+                          }}
+                        >
+                          <img src={s.photoUrl || 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=300&h=160&fit=crop&q=70'} alt={s.name} className="w-60 h-28 object-cover rounded-t-lg" />
+                          <div className="p-2">
+                            <div className="text-xs font-semibold line-clamp-1 text-slate-800 dark:text-slate-100">{s.name}</div>
+                            <div className="text-[11px] text-slate-500 line-clamp-1">{s.address}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                         </div>
 
                         {/* Route Options */}
@@ -325,28 +390,19 @@ const Destinations = () => {
                   </div>
 
                   {/* Right Side - Map */}
-                  <div className="space-y-6">
-                    <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-lg rounded-2xl shadow-xl border border-slate-200/50 dark:border-slate-700/50 overflow-hidden">
-                      <div className="h-96">
-                        {mapUrl ? (
-                          <iframe
-                            src={mapUrl}
-                            width="100%"
-                            height="100%"
-                            style={{ border: 0 }}
-                            allowFullScreen
-                            loading="lazy"
-                            referrerPolicy="no-referrer-when-downgrade"
-                            title="Trip Destinations Map"
-                          />
-                        ) : (
-                          <div className="h-full flex items-center justify-center bg-slate-50 dark:bg-slate-700">
-                            <div className="text-center">
-                              <MapPin className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                              <p className="text-slate-500 dark:text-slate-400">Select destinations to view on map</p>
-                            </div>
-                          </div>
-                        )}
+                <div className="space-y-6" >
+                  <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-lg rounded-2xl shadow-xl border border-slate-200/50 dark:border-slate-700/50 overflow-hidden">
+                      <div className="h-[460px]" style={{ maxHeight: 'calc(100vh - 260px)' }}>
+                  {apiKey && pins.length > 0 ? (
+                    <MapEmbed apiKey={apiKey} pins={pins} className="w-full h-full" />
+                  ) : (
+                    <div className="h-full flex items-center justify-center bg-slate-50 dark:bg-slate-700">
+                      <div className="text-center">
+                        <MapPin className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                        <p className="text-slate-500 dark:text-slate-400">Select destinations to view on map</p>
+                      </div>
+                    </div>
+                  )}
                       </div>
                     </div>
                   </div>
