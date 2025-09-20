@@ -1,8 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { ArrowRight, X, Plus, Users, Settings, MapPin, Calendar, Clock, Star, Heart, Navigation, Check, ChevronDown, Undo, Search, Bot } from "lucide-react";
+import { X, Plus, Users, Settings, MapPin, ChevronDown, Bot } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "@/components/Sidebar";
@@ -19,6 +18,7 @@ const Destinations = () => {
     duration: '5 days',
     travelTime: 'October',
     travelers: 5,
+
     preferences: []
   });
 
@@ -279,7 +279,7 @@ const Destinations = () => {
                           </div>
                           
                           <p className="text-[13px] text-slate-600 dark:text-slate-400 mb-4">
-                            Chosen by Airial based on the conversation.
+                            Chosen by Travion based on the conversation.
                           </p>
                           <p className="text-[13px] text-slate-600 dark:text-slate-400 mb-4">
                             You can <span className="text-blue-600 cursor-pointer">Add to</span>, <span className="text-blue-600 cursor-pointer">Remove from</span>, or <span className="text-blue-600 cursor-pointer">Reorder</span> this list

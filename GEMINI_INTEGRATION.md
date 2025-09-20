@@ -1,7 +1,7 @@
 # Gemini AI Integration for Travion AI Bharat Explorer
 
 ## Overview
-This project now includes full integration with Google Gemini AI to provide intelligent, conversational travel planning assistance. The AI agent "Airial" can understand user preferences, ask relevant questions, and provide personalized travel recommendations.
+This project now includes full integration with Google Gemini AI to provide intelligent, conversational travel planning assistance. The AI agent "Travion" can understand user preferences, ask relevant questions, and provide personalized travel recommendations.
 
 ## Setup Instructions
 

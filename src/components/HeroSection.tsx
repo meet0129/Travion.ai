@@ -72,7 +72,7 @@ const HeroSection = () => {
                 className="px-8 py-3 rounded-full font-medium hover:scale-105 transition-all duration-300 hover:shadow-lg border-slate-300 dark:border-slate-600 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm"
                 onClick={() => navigate("/preferences")}
               >
-                Ask Airial
+                Ask Travion
               </Button>
             </div>
 

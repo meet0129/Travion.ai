@@ -115,7 +115,7 @@ const PreferencesWidget = ({ destination, onComplete }: Props) => {
         
         <p className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-2">
           <Heart className="w-4 h-4 text-pink-500 fill-pink-500" />
-          Follow your inspiration — Airial will connect the dots and create a journey filled with moments that feel just right.
+          Follow your inspiration — Travion will connect the dots and create a journey filled with moments that feel just right.
         </p>
       </div>
 
