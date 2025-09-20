@@ -1,9 +1,19 @@
 import { GoogleGenAI } from '@google/genai';
 
-// Initialize Gemini AI
-const ai = new GoogleGenAI({
-  apiKey: import.meta.env.VITE_GEMINI_API_KEY || ''
-});
+// Initialize Gemini AI with fallback
+let ai: GoogleGenAI | null = null;
+
+try {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (apiKey && apiKey.trim() !== '') {
+    ai = new GoogleGenAI({ apiKey });
+    console.log('✅ Gemini AI initialized successfully');
+  } else {
+    console.warn('⚠️ Gemini API key not found. Using fallback responses.');
+  }
+} catch (error) {
+  console.error('❌ Failed to initialize Gemini AI:', error);
+}
 
 // Enhanced system prompt for the optimized AI travel agent
 const SYSTEM_PROMPT = `You are Travion, a smart AI travel agent specializing in Indian destinations. Your job is to conversationally ask ONLY the essential questions, capture answers, and then hand off to the preferences UI.
@@ -70,6 +80,13 @@ class GeminiService {
           content: "Hey there! 🌟 Let's plan your Indian getaway. Which destination in India are you thinking about first?"
         }
       ];
+      
+      // Log initialization status
+      if (ai) {
+        console.log('✅ Gemini service initialized with AI');
+      } else {
+        console.log('⚠️ Gemini service initialized with fallback responses');
+      }
     } catch (error) {
       console.error('Error initializing Gemini service:', error);
       throw new Error('Failed to initialize Gemini service');
@@ -84,6 +101,11 @@ class GeminiService {
         role: 'user',
         content: userMessage
       });
+
+      // If Gemini AI is not available, use fallback responses
+      if (!ai) {
+        return this.getFallbackResponse(userMessage, tripContext);
+      }
 
       // Create context-aware prompt
       let contextualPrompt = userMessage;
@@ -142,6 +164,43 @@ Respond based on what information is still needed. If you have all essential inf
     }
   }
 
+  // Fallback responses when Gemini API is not available
+  private getFallbackResponse(userMessage: string, tripContext?: any): string {
+    const lowerMessage = userMessage.toLowerCase();
+    
+    // Check if we have all required information
+    const hasDestination = tripContext?.destination;
+    const hasStartLocation = tripContext?.startLocation;
+    const hasDates = tripContext?.startDate || tripContext?.endDate;
+    const hasTravelers = tripContext?.travelers > 0;
+    const hasDuration = tripContext?.duration;
+
+    // If we have all essential info, suggest moving to preferences
+    if (hasDestination && hasStartLocation && (hasDates || hasDuration) && hasTravelers) {
+      return "Perfect! I have all the essential details. Let's move on to your travel preferences! 🎯";
+    }
+
+    // Determine what information is still needed
+    if (!hasDestination) {
+      return "Hey there! 🌟 Let's plan your Indian getaway. Which destination in India are you thinking about first?";
+    }
+    
+    if (!hasStartLocation) {
+      return `Great choice! ${tripContext.destination} is amazing! Which city will you be starting your journey from? 🚀`;
+    }
+    
+    if (!hasDates && !hasDuration) {
+      return `Perfect! So you're planning to visit ${tripContext.destination} from ${tripContext.startLocation}. When would you like to travel? You can tell me specific dates or just the duration you're planning! 📅`;
+    }
+    
+    if (!hasTravelers) {
+      return `Excellent! So you're planning a trip to ${tripContext.destination} from ${tripContext.startLocation}. How many people will be traveling? 👥`;
+    }
+
+    // Default response
+    return "That sounds amazing! Tell me more about your travel plans and I'll help you create the perfect itinerary! ✨";
+  }
+
   // Get chat history
   getChatHistory(): Array<{ role: 'user' | 'model', content: string }> {
     return this.conversationHistory;
@@ -191,12 +250,13 @@ export const geminiService = new GeminiService();
 // Export utility functions
 export const initializeGemini = async (): Promise<boolean> => {
   try {
-    if (!geminiService.isConfigured()) {
-      console.warn('Gemini API key not configured. Please add VITE_GEMINI_API_KEY to your .env file.');
-      return false;
-    }
     await geminiService.initialize();
-    return true;
+    
+    if (!geminiService.isConfigured()) {
+      console.warn('⚠️ Gemini API key not configured. Using fallback responses. Add VITE_GEMINI_API_KEY to your .env file for full AI functionality.');
+    }
+    
+    return true; // Always return true to allow the app to work with fallback responses
   } catch (error) {
     console.error('Failed to initialize Gemini:', error);
     return false;

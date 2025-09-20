@@ -63,9 +63,7 @@ const Chat = () => {
       try {
         const initialized = await initializeGemini();
         setIsGeminiInitialized(initialized);
-        if (!initialized) {
-          setError('Gemini API is not configured. Please add your API key to the .env file.');
-        }
+        
         if (initialized) {
           // Load persisted context if any
           try {

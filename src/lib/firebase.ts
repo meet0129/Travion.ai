@@ -29,8 +29,26 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_PUBLIC_FIREBASE_MEASUREMENT_ID || "",
 };
 
+// Debug Firebase configuration
+console.log('🔧 Firebase Config Debug:', {
+  apiKey: firebaseConfig.apiKey ? 'SET' : 'NOT SET',
+  authDomain: firebaseConfig.authDomain ? 'SET' : 'NOT SET',
+  projectId: firebaseConfig.projectId ? 'SET' : 'NOT SET',
+  storageBucket: firebaseConfig.storageBucket ? 'SET' : 'NOT SET',
+  messagingSenderId: firebaseConfig.messagingSenderId ? 'SET' : 'NOT SET',
+  appId: firebaseConfig.appId ? 'SET' : 'NOT SET',
+  measurementId: firebaseConfig.measurementId ? 'SET' : 'NOT SET'
+});
+
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
+let app;
+try {
+  app = initializeApp(firebaseConfig);
+  console.log('✅ Firebase initialized successfully');
+} catch (error) {
+  console.error('❌ Firebase initialization failed:', error);
+  throw error;
+}
 
 // Initialize Firebase Authentication and get a reference to the service
 export const auth = getAuth(app);
