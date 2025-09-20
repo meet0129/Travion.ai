@@ -2,6 +2,9 @@ import { useEffect, useState, useMemo } from 'react';
 import { fetchAllCategoriesForDestination, PlaceItem, geocodeDestination, nearbyByCategory, similarPlacesByPlace } from '../database/googlePlaces';
 import { Heart, ChevronRight, Info } from 'lucide-react';
 import PlaceDetailDialog from './PlaceDetailDialog';
+import { debugEnvironment } from '../lib/debug-env';
+import '../lib/test-api-call';
+import '../lib/verify-setup';
 
 type Props = {
   destination: string;
@@ -36,18 +39,28 @@ const PreferencesWidget = ({ destination, onComplete }: Props) => {
     hidden_gems: false
   });
 
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
+  const apiKey = import.meta.env.VITE_GOOGLE_PLACES_API_KEY as string | undefined;
 
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
-      if (!destination || !apiKey) return;
+      // Debug environment variables
+      debugEnvironment();
+      
+      console.log('🔍 PreferencesWidget: Starting API call', { destination, apiKey: !!apiKey });
+      if (!destination || !apiKey) {
+        console.warn('❌ Missing destination or API key', { destination, apiKey: !!apiKey });
+        return;
+      }
       setLoading(true);
       setError(null);
       try {
+        console.log('🚀 Calling fetchAllCategoriesForDestination...');
         const result = await fetchAllCategoriesForDestination(destination, apiKey, 6);
+        console.log('✅ API call successful', result);
         if (!cancelled) setData(result as any);
       } catch (e) {
+        console.error('❌ API call failed:', e);
         if (!cancelled) setError('Failed to load places for this destination.');
       } finally {
         if (!cancelled) setLoading(false);
@@ -216,20 +229,50 @@ const PreferencesWidget = ({ destination, onComplete }: Props) => {
                       {place.address}
                     </p>
                     
-                    {/* Rating */}
+                    {/* Rating and Metadata */}
                     {place.rating && (
-                      <div className="mt-2 flex items-center gap-2">
-                        <div className="flex items-center gap-1">
-                          <span className="text-yellow-500 text-xs">★</span>
-                          <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                            {place.rating.toFixed(1)}
-                          </span>
+                      <div className="mt-2 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <span className="text-yellow-500 text-xs">★</span>
+                            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                              {place.rating.toFixed(1)}
+                            </span>
+                          </div>
+                          {place.userRatingsTotal && (
+                            <span className="text-xs text-slate-500 dark:text-slate-400">
+                              ({place.userRatingsTotal > 1000 ? Math.floor(place.userRatingsTotal/1000) + 'k' : place.userRatingsTotal})
+                            </span>
+                          )}
                         </div>
-                        {place.userRatingsTotal && (
-                          <span className="text-xs text-slate-500 dark:text-slate-400">
-                            ({place.userRatingsTotal > 1000 ? Math.floor(place.userRatingsTotal/1000) + 'k' : place.userRatingsTotal})
-                          </span>
-                        )}
+                        
+                        {/* Additional Metadata */}
+                        <div className="flex items-center gap-2 text-xs">
+                          {/* Price Range */}
+                          {place.priceRange && (
+                            <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full font-medium">
+                              {place.priceRange}
+                            </span>
+                          )}
+                          
+                          {/* Open Status */}
+                          {place.isOpen !== undefined && (
+                            <span className={`px-2 py-1 rounded-full font-medium ${
+                              place.isOpen 
+                                ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' 
+                                : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                            }`}>
+                              {place.isOpen ? 'Open' : 'Closed'}
+                            </span>
+                          )}
+                          
+                          {/* Business Status */}
+                          {place.businessStatus && place.businessStatus !== 'OPERATIONAL' && (
+                            <span className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full font-medium">
+                              {place.businessStatus.replace('_', ' ')}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>

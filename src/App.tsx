@@ -14,6 +14,9 @@ import Profile from "./pages/Profile";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import NotFound from "./pages/NotFound";
+import "./lib/test-firebase";
+import "./lib/test-gemini-fallback";
+import "./lib/test-categorization";
 
 const queryClient = new QueryClient();
 
