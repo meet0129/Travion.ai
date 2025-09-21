@@ -9,6 +9,7 @@ import '../lib/verify-setup';
 type Props = {
   destination: string;
   onComplete: (pickedIds: string[]) => void;
+  onPreferencesChange?: (preferences: any[]) => void;
 };
 
 type TabKey = 'attractions' | 'day_trips' | 'food_cafes' | 'hidden_gems';
@@ -20,7 +21,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'hidden_gems', label: 'Hidden Gems' },
 ];
 
-const PreferencesWidget = ({ destination, onComplete }: Props) => {
+const PreferencesWidget = ({ destination, onComplete, onPreferencesChange }: Props) => {
   const [active, setActive] = useState<TabKey>('attractions');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -106,6 +107,13 @@ const PreferencesWidget = ({ destination, onComplete }: Props) => {
     if (place) {
       setPickedPlaces(prev => ({ ...prev, [place.id]: place }));
     }
+    
+    // Call onPreferencesChange to sync with parent component
+    if (onPreferencesChange) {
+      const selectedPlaces = Object.values(pickedPlaces).filter(p => newPicked.includes(p.id));
+      onPreferencesChange(selectedPlaces);
+    }
+    
     // Load more places if user has selected preferences and we haven't loaded more yet
     if (newPicked.length > 0 && !showMore[active]) {
       loadMorePlaces(active);

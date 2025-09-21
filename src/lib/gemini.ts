@@ -31,15 +31,14 @@ ESSENTIAL INFORMATION TO COLLECT (STRICT ORDER):
 4. Number of travelers
 
 CONVERSATION RULES:
-1. Start by asking about their desired destination in India. Do not assume.
+1. Read and analyze ALL previous messages in the conversation history
 2. Extract and remember ALL information provided in each message
-3. NEVER ask for information already given
-4. Ask ONE question at a time, focusing on the next missing essential info
-5. If user mentions BOTH start and end dates, calculate and store duration; do NOT ask for duration
-6. If user only gives a start date, ask for duration
-7. Acknowledge each piece of info you collect with brief enthusiasm
-8. After collecting ALL required info, immediately reply EXACTLY ONCE with: "Perfect! I have all the essential details. Let's move on to your travel preferences! 🎯"
-9. After that message, do not ask any further questions.
+3. If user provides multiple pieces of information in one message, acknowledge all of them
+4. If ALL required information is provided in one message, immediately proceed to confirmation
+5. If some information is missing, ask for the next missing piece
+6. Acknowledge each piece of info you collect with brief enthusiasm
+7. After collecting ALL required info, immediately reply EXACTLY ONCE with: "Perfect! I have all the essential details. Let's move on to your travel preferences! 🎯"
+8. After that message, do not ask any further questions.
 
 INFORMATION EXTRACTION RULES:
 - Destination: Any mentioned Indian city/state/region
@@ -94,7 +93,7 @@ class GeminiService {
   }
 
   // Send a message to Gemini with trip context awareness
-  async sendMessage(userMessage: string, tripContext?: any): Promise<string> {
+  async sendMessage(userMessage: string, tripContext?: any, previousMessages?: any[]): Promise<string> {
     try {
       // Add user message to conversation history
       this.conversationHistory.push({
@@ -105,6 +104,18 @@ class GeminiService {
       // If Gemini AI is not available, use fallback responses
       if (!ai) {
         return this.getFallbackResponse(userMessage, tripContext);
+      }
+
+      // Build context-aware conversation history
+      let conversationHistory = [...this.conversationHistory];
+      
+      // Add previous messages if provided for context awareness
+      if (previousMessages && previousMessages.length > 0) {
+        const previousConversation = previousMessages.map(msg => ({
+          role: (msg.sender === 'user' ? 'user' : 'model') as 'user' | 'model',
+          content: String(msg.text || msg.content || '')
+        }));
+        conversationHistory = [...previousConversation, ...conversationHistory];
       }
 
       // Create context-aware prompt
@@ -242,6 +253,53 @@ Respond based on what information is still needed. If you have all essential inf
     
     return parts.length > 0 ? parts.join(' • ') : 'Planning your trip...';
   }
+
+  // Generate chat title based on conversation data
+  async generateChatTitle(chatData: any): Promise<string> {
+    if (!ai) {
+      // Fallback title generation
+      const destination = chatData.destination || 'India';
+      const travelers = chatData.travelers || 1;
+      const duration = chatData.duration || 'trip';
+      return `${destination} ${duration} for ${travelers} traveler${travelers > 1 ? 's' : ''}`;
+    }
+
+    try {
+      let prompt = `Based on this travel conversation, create a short, descriptive title (max 6 words) for this chat:`;
+
+      // If we have chat summary, use it for better context
+      if (chatData.chatSummary) {
+        prompt += `\n\nConversation Summary:\n${chatData.chatSummary}`;
+      } else {
+        // Fallback to basic trip data
+        prompt += `\n\nTrip Details:
+Destination: ${chatData.destination || 'Not specified'}
+Start Location: ${chatData.startLocation || 'Not specified'}
+Duration: ${chatData.duration || 'Not specified'}
+Travelers: ${chatData.travelers || 'Not specified'}
+Budget: ${chatData.budget || 'Not specified'}`;
+      }
+
+      prompt += `\n\nCreate a concise, engaging title that captures the essence of this trip planning conversation. Examples: "Manali Adventure for 5", "Goa Beach Trip", "Rajasthan Family Journey", "Weekend Getaway to Shimla"`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [{ role: 'user', parts: [{ text: prompt }] }]
+      });
+
+      const title = typeof (response as any).text === 'function' ? (response as any).text() : ((response as any).candidates?.[0]?.content?.parts?.[0]?.text || `${chatData.destination || 'India'} Trip`);
+      
+      // Clean up the title (remove quotes, extra spaces, etc.)
+      const cleanTitle = title.replace(/['"]/g, '').trim();
+      return cleanTitle || `${chatData.destination || 'India'} Trip`;
+    } catch (error) {
+      console.error('Failed to generate chat title:', error);
+      // Fallback title
+      const destination = chatData.destination || 'India';
+      const travelers = chatData.travelers || 1;
+      return `${destination} Trip for ${travelers}`;
+    }
+  }
 }
 
 // Export singleton instance
@@ -263,8 +321,8 @@ export const initializeGemini = async (): Promise<boolean> => {
   }
 };
 
-export const sendMessageToGemini = async (message: string, tripContext?: any): Promise<string> => {
-  return await geminiService.sendMessage(message, tripContext);
+export const sendMessageToGemini = async (message: string, tripContext?: any, previousMessages?: any[]): Promise<string> => {
+  return await geminiService.sendMessage(message, tripContext, previousMessages);
 };
 
 export default geminiService;

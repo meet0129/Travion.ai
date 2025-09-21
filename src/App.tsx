@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SidebarProvider } from "@/contexts/SidebarContext";
+import { TripsProvider } from "@/contexts/TripsContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Chat from "./pages/Chat";
@@ -17,6 +18,8 @@ import NotFound from "./pages/NotFound";
 import "./lib/test-firebase";
 import "./lib/test-gemini-fallback";
 import "./lib/test-categorization";
+import "./lib/test-categorization-fix";
+import "./lib/test-uuid-fix";
 
 const queryClient = new QueryClient();
 
@@ -27,12 +30,18 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <SidebarProvider>
+          <TripsProvider>
+            <SidebarProvider>
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/signin" element={<SignIn />} />
               <Route path="/signup" element={<SignUp />} />
               <Route path="/chat" element={
+                <ProtectedRoute>
+                  <Chat />
+                </ProtectedRoute>
+              } />
+              <Route path="/chat/:chatId" element={
                 <ProtectedRoute>
                   <Chat />
                 </ProtectedRoute>
@@ -55,7 +64,8 @@ const App = () => (
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </SidebarProvider>
+            </SidebarProvider>
+          </TripsProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

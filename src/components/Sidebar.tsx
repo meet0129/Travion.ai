@@ -5,13 +5,65 @@ import { useAuth } from "@/contexts/AuthContext";
 import UserProfile from "@/components/UserProfile";
 import { useNavigate } from "react-router-dom";
 import MyTrips from "@/components/MyTrips";
+import { v4 as uuidv4 } from "uuid";
+import { geminiService } from "@/lib/gemini";
+import { useTrips } from "@/contexts/TripsContext";
 
 const Sidebar = () => {
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [isMyTripsOpen, setIsMyTripsOpen] = useState(false);
   const { currentUser, logout } = useAuth();
+  const { saveTrip } = useTrips();
   const navigate = useNavigate();
   const sidebarRef = useRef<HTMLDivElement>(null);
+
+  // Save current chat before creating new one
+  const saveCurrentChat = async () => {
+    try {
+      const currentChatId = sessionStorage.getItem('currentChatId');
+      if (!currentChatId) return;
+
+      // Get current chat data
+      const tripContext = JSON.parse(sessionStorage.getItem(`tripContext_${currentChatId}`) || '{}');
+      const messages = JSON.parse(sessionStorage.getItem(`messages_${currentChatId}`) || '[]');
+      const tripData = JSON.parse(localStorage.getItem(`tripData_${currentChatId}`) || '{}');
+
+      // Only save if there are meaningful messages (more than just initial greeting)
+      if (messages.length <= 1) return;
+
+      // Generate title using Gemini
+      let title = 'My Trip';
+      try {
+        const chatSummary = messages.map(msg => `${msg.sender}: ${msg.text || msg.content}`).join('\n');
+        title = await geminiService.generateChatTitle({
+          ...tripContext,
+          chatSummary
+        });
+      } catch (error) {
+        console.error('Failed to generate chat title:', error);
+        // Fallback title
+        if (tripContext.destination) {
+          title = `${tripContext.destination} Trip`;
+        }
+      }
+
+      // Save the trip
+      saveTrip({
+        chatId: currentChatId,
+        title,
+        destinations: tripData.destinations || [],
+        startDate: tripContext.startDate || new Date().toISOString(),
+        endDate: tripContext.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        travelers: tripContext.travelers || 1,
+        preferences: tripData.preferences || [],
+        chatData: { tripContext, messages }
+      });
+
+      console.log('Current chat saved successfully');
+    } catch (error) {
+      console.error('Error saving current chat:', error);
+    }
+  };
 
   // Handle click outside to collapse sidebar
   useEffect(() => {
@@ -172,8 +224,19 @@ const Sidebar = () => {
             {currentUser && (
               <Button
                 className="w-full text-center py-2.5 rounded-full text-white font-semibold bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 transition-all duration-200"
-                onClick={() => {
-                  navigate("/chat");
+                onClick={async () => {
+                  // Save current chat before creating new one
+                  await saveCurrentChat();
+                  
+                  const newChatId = uuidv4();
+                  sessionStorage.setItem('currentChatId', newChatId);
+                  // Clear any existing chat data for fresh start
+                  sessionStorage.removeItem(`tripContext_${newChatId}`);
+                  sessionStorage.removeItem(`messages_${newChatId}`);
+                  localStorage.removeItem(`tripData_${newChatId}`);
+                  localStorage.removeItem('initialTripDescription');
+                  
+                  navigate(`/chat/${newChatId}`);
                   setIsCollapsed(true);
                 }}
               >
