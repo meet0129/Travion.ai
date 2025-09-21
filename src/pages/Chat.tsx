@@ -550,10 +550,12 @@ const Chat = () => {
     try {
       // Send message to Gemini with full conversation history
       setIsThinking(true);
-      const aiResponse = await sendMessageToGemini(message, tripContext, messages);
+      const geminiResult = await sendMessageToGemini(message, tripContext, messages);
 
-      // Extract information from user's message
-      const updatedContext = extractTripInfo(message, tripContext);
+      // Handle both old string response and new object response
+      const aiResponse = typeof geminiResult === 'string' ? geminiResult : geminiResult.response;
+      const updatedContext = typeof geminiResult === 'string' ? extractTripInfo(message, tripContext) : geminiResult.updatedContext;
+      
       setTripContext(updatedContext);
 
       // Check if all essential information is collected
