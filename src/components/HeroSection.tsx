@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, ChevronDown, MapPin, Calendar, Users, Star } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { v4 as uuidv4 } from "uuid";
 import Sidebar from "@/components/Sidebar";
 import PopularTrips from "./PopularTrips";
 
@@ -11,8 +12,9 @@ const HeroSection = () => {
 
   const handleSubmit = () => {
     if (tripDescription.trim()) {
+      const newChatId = uuidv4();
       localStorage.setItem('initialTripDescription', tripDescription);
-      navigate("/chat");
+      navigate(`/chat/${newChatId}`);
     }
   };
 
@@ -25,8 +27,9 @@ const HeroSection = () => {
 
   const handleTripSelect = (trip) => {
     const tripQuery = `Plan a ${trip.duration} trip to ${trip.title.split(' ')[0]} from Ahmedabad`;
+    const newChatId = uuidv4();
     localStorage.setItem('initialTripDescription', tripQuery);
-    navigate("/chat");
+    navigate(`/chat/${newChatId}`);
   };
 
   return (
@@ -61,7 +64,7 @@ const HeroSection = () => {
               <Button 
                 size="lg" 
                 className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white px-8 py-3 rounded-full font-semibold hover:scale-105 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/25"
-                onClick={() => navigate("/chat")}
+                onClick={() => navigate(`/chat/${uuidv4()}`)}
               >
                 Plan a Trip
               </Button>

@@ -30,21 +30,11 @@ const firebaseConfig = {
 };
 
 // Debug Firebase configuration
-console.log('🔧 Firebase Config Debug:', {
-  apiKey: firebaseConfig.apiKey ? 'SET' : 'NOT SET',
-  authDomain: firebaseConfig.authDomain ? 'SET' : 'NOT SET',
-  projectId: firebaseConfig.projectId ? 'SET' : 'NOT SET',
-  storageBucket: firebaseConfig.storageBucket ? 'SET' : 'NOT SET',
-  messagingSenderId: firebaseConfig.messagingSenderId ? 'SET' : 'NOT SET',
-  appId: firebaseConfig.appId ? 'SET' : 'NOT SET',
-  measurementId: firebaseConfig.measurementId ? 'SET' : 'NOT SET'
-});
 
 // Initialize Firebase
 let app;
 try {
   app = initializeApp(firebaseConfig);
-  console.log('✅ Firebase initialized successfully');
 } catch (error) {
   console.error('❌ Firebase initialization failed:', error);
   throw error;

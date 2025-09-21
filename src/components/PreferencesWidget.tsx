@@ -9,6 +9,7 @@ import '../lib/verify-setup';
 type Props = {
   destination: string;
   onComplete: (pickedIds: string[]) => void;
+  onPreferencesChange?: (preferences: any[]) => void;
 };
 
 type TabKey = 'attractions' | 'day_trips' | 'food_cafes' | 'hidden_gems';
@@ -20,7 +21,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'hidden_gems', label: 'Hidden Gems' },
 ];
 
-const PreferencesWidget = ({ destination, onComplete }: Props) => {
+const PreferencesWidget = ({ destination, onComplete, onPreferencesChange }: Props) => {
   const [active, setActive] = useState<TabKey>('attractions');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,24 +42,105 @@ const PreferencesWidget = ({ destination, onComplete }: Props) => {
 
   const apiKey = import.meta.env.VITE_GOOGLE_PLACES_API_KEY as string | undefined;
 
+  // Initialize with previously selected preferences (chat-specific only)
+  useEffect(() => {
+    try {
+      // Get current chat ID - only load if we have a specific chat
+      const currentChatId = sessionStorage.getItem('currentChatId');
+      
+      if (currentChatId) {
+        const storageKey = `selectedPreferences_${currentChatId}`;
+        const savedPreferences = localStorage.getItem(storageKey);
+        
+        if (savedPreferences) {
+          const preferences = JSON.parse(savedPreferences);
+          const pickedIds = preferences.map(p => p.id);
+          const pickedPlacesMap = {};
+          preferences.forEach(p => {
+            pickedPlacesMap[p.id] = p;
+          });
+          setPicked(pickedIds);
+          setPickedPlaces(pickedPlacesMap);
+          
+          // Notify parent about loaded preferences
+          if (onPreferencesChange) {
+            onPreferencesChange(preferences);
+          }
+        } else {
+          // No saved preferences for this chat - start fresh
+          setPicked([]);
+          setPickedPlaces({});
+          if (onPreferencesChange) {
+            onPreferencesChange([]);
+          }
+        }
+      } else {
+        // No chat ID - start completely fresh
+        setPicked([]);
+        setPickedPlaces({});
+        if (onPreferencesChange) {
+          onPreferencesChange([]);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading saved preferences:', error);
+      // On error, start fresh
+      setPicked([]);
+      setPickedPlaces({});
+      if (onPreferencesChange) {
+        onPreferencesChange([]);
+      }
+    }
+  }, [onPreferencesChange]);
+
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
       // Debug environment variables
       debugEnvironment();
       
-      console.log('🔍 PreferencesWidget: Starting API call', { destination, apiKey: !!apiKey });
       if (!destination || !apiKey) {
-        console.warn('❌ Missing destination or API key', { destination, apiKey: !!apiKey });
         return;
       }
+
+      // Check cache first
+      const cacheKey = `preferences_${destination}`;
+      const cachedData = localStorage.getItem(cacheKey);
+      
+      if (cachedData) {
+        try {
+          const parsedData = JSON.parse(cachedData);
+          // Check if cache is less than 24 hours old
+          const cacheTime = parsedData.timestamp;
+          const now = Date.now();
+          const twentyFourHours = 24 * 60 * 60 * 1000;
+          
+          if (now - cacheTime < twentyFourHours) {
+            setData(parsedData.data);
+            return;
+          }
+        } catch (error) {
+          console.error('Error parsing cached data:', error);
+        }
+      }
+
       setLoading(true);
       setError(null);
       try {
-        console.log('🚀 Calling fetchAllCategoriesForDestination...');
         const result = await fetchAllCategoriesForDestination(destination, apiKey, 6);
-        console.log('✅ API call successful', result);
-        if (!cancelled) setData(result as any);
+        if (!cancelled) {
+          setData(result as any);
+          
+          // Cache the result
+          try {
+            localStorage.setItem(cacheKey, JSON.stringify({
+              data: result,
+              timestamp: Date.now()
+            }));
+          } catch (error) {
+            console.error('Error caching preferences data:', error);
+          }
+        }
       } catch (e) {
         console.error('❌ API call failed:', e);
         if (!cancelled) setError('Failed to load places for this destination.');
@@ -74,6 +156,33 @@ const PreferencesWidget = ({ destination, onComplete }: Props) => {
   const loadMorePlaces = async (category: TabKey) => {
     if (!destination || !apiKey || showMore[category]) return;
     
+    // Check cache for "more places" data
+    const moreCacheKey = `preferences_more_${destination}_${category}`;
+    const cachedMoreData = localStorage.getItem(moreCacheKey);
+    
+    if (cachedMoreData) {
+      try {
+        const parsedData = JSON.parse(cachedMoreData);
+        const cacheTime = parsedData.timestamp;
+        const now = Date.now();
+        const twentyFourHours = 24 * 60 * 60 * 1000;
+        
+        if (now - cacheTime < twentyFourHours) {
+          setData(prev => ({
+            ...prev,
+            [category]: parsedData.data
+          }));
+          setShowMore(prev => ({
+            ...prev,
+            [category]: true
+          }));
+          return;
+        }
+      } catch (error) {
+        console.error('Error parsing cached more data:', error);
+      }
+    }
+    
     setLoading(true);
     try {
       const loc = await geocodeDestination(destination, apiKey);
@@ -87,6 +196,16 @@ const PreferencesWidget = ({ destination, onComplete }: Props) => {
           ...prev,
           [category]: true
         }));
+        
+        // Cache the more places data
+        try {
+          localStorage.setItem(moreCacheKey, JSON.stringify({
+            data: morePlaces,
+            timestamp: Date.now()
+          }));
+        } catch (error) {
+          console.error('Error caching more places data:', error);
+        }
       }
     } catch (e) {
       setError('Failed to load more places.');
@@ -101,11 +220,44 @@ const PreferencesWidget = ({ destination, onComplete }: Props) => {
   const toggle = (id: string) => {
     const list = data[active] || [];
     const place = list.find(p => p.id === id);
-    const newPicked = picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id];
+    const isCurrentlyPicked = picked.includes(id);
+    const newPicked = isCurrentlyPicked ? picked.filter((x) => x !== id) : [...picked, id];
+    
     setPicked(newPicked);
-    if (place) {
+    
+    // Update pickedPlaces
+    if (place && !isCurrentlyPicked) {
       setPickedPlaces(prev => ({ ...prev, [place.id]: place }));
+    } else if (isCurrentlyPicked) {
+      setPickedPlaces(prev => {
+        const updated = { ...prev };
+        delete updated[id];
+        return updated;
+      });
     }
+    
+    // Update localStorage immediately for real-time sync (chat-specific)
+    const updatedPlaces = isCurrentlyPicked 
+      ? Object.values(pickedPlaces).filter(p => p.id !== id)
+      : place 
+        ? [...Object.values(pickedPlaces).filter(p => p.id !== id), place]
+        : Object.values(pickedPlaces).filter(p => p.id !== id);
+    
+    try {
+      const currentChatId = sessionStorage.getItem('currentChatId');
+      if (currentChatId) {
+        const storageKey = `selectedPreferences_${currentChatId}`;
+        localStorage.setItem(storageKey, JSON.stringify(updatedPlaces));
+      }
+    } catch (error) {
+      console.error('Error saving preferences:', error);
+    }
+    
+    // Call onPreferencesChange to sync with parent component
+    if (onPreferencesChange) {
+      onPreferencesChange(updatedPlaces);
+    }
+    
     // Load more places if user has selected preferences and we haven't loaded more yet
     if (newPicked.length > 0 && !showMore[active]) {
       loadMorePlaces(active);
@@ -116,14 +268,11 @@ const PreferencesWidget = ({ destination, onComplete }: Props) => {
     <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-lg rounded-2xl shadow-xl border border-slate-200/50 dark:border-slate-700/50 overflow-hidden">
       {/* Header */}
       <div className="p-6 border-b border-slate-200 dark:border-slate-700">
-        <div className="flex items-center justify-between mb-4">
+        <div className="mb-4">
           <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             Pick What You Love 
             <Heart className="w-5 h-5 text-pink-500 fill-pink-500" />
           </h3>
-          <button className="text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
-            Skip this step &gt;&gt;
-          </button>
         </div>
         
         <p className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-2">
@@ -331,7 +480,15 @@ const PreferencesWidget = ({ destination, onComplete }: Props) => {
             <button
               onClick={() => {
                 const selected = picked.map(id => pickedPlaces[id]).filter(Boolean);
-                localStorage.setItem('selectedPreferences', JSON.stringify(selected));
+                // Persist per-chat for real-time sync with Destinations and chat sessions
+                try {
+                  const currentChatId = sessionStorage.getItem('currentChatId');
+                  if (currentChatId) {
+                    const storageKey = `selectedPreferences_${currentChatId}`;
+                    localStorage.setItem(storageKey, JSON.stringify(selected));
+                    sessionStorage.setItem(`selectedPreferences_${currentChatId}`, JSON.stringify(selected));
+                  }
+                } catch {}
                 onComplete(picked);
               }}
               disabled={picked.length === 0}

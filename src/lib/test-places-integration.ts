@@ -6,21 +6,14 @@
 import { fetchAllCategoriesForDestination, geocodeDestination } from '../database/googlePlaces';
 
 export async function testPlacesIntegration(apiKey: string, destination: string = 'Mumbai, India') {
-  console.log('🧪 Testing Google Places API Integration...');
-  
   try {
     // Test 1: Geocoding
-    console.log('📍 Testing geocoding...');
     const location = await geocodeDestination(destination, apiKey);
-    if (location) {
-      console.log('✅ Geocoding successful:', location);
-    } else {
-      console.log('❌ Geocoding failed');
+    if (!location) {
       return false;
     }
 
     // Test 2: Category-based search
-    console.log('🔍 Testing category-based search...');
     const categories = await fetchAllCategoriesForDestination(destination, apiKey, 3);
     
     const categoryResults = {
@@ -30,19 +23,13 @@ export async function testPlacesIntegration(apiKey: string, destination: string 
       hidden_gems: categories.hidden_gems.length
     };
     
-    console.log('📊 Category results:', categoryResults);
-    
     // Check if we got results for at least one category
     const totalResults = Object.values(categoryResults).reduce((sum, count) => sum + count, 0);
-    if (totalResults > 0) {
-      console.log('✅ Category search successful');
-    } else {
-      console.log('❌ No results found for any category');
+    if (totalResults === 0) {
       return false;
     }
 
     // Test 3: Enhanced data fields
-    console.log('🔍 Testing enhanced data fields...');
     const samplePlace = categories.attractions[0] || categories.day_trips[0] || categories.food_cafes[0] || categories.hidden_gems[0];
     
     if (samplePlace) {
@@ -54,16 +41,11 @@ export async function testPlacesIntegration(apiKey: string, destination: string 
         hasEditorialSummary: !!samplePlace.editorialSummary,
         hasPhotos: !!samplePlace.photos && samplePlace.photos.length > 0
       };
-      
-      console.log('📋 Enhanced fields available:', enhancedFields);
-      console.log('✅ Enhanced data fields test completed');
     }
 
-    console.log('🎉 All tests passed! Integration is working correctly.');
     return true;
     
   } catch (error) {
-    console.error('❌ Test failed:', error);
     return false;
   }
 }

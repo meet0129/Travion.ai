@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import { v4 as uuidv4 } from "uuid";
 import {
   AlertCircle,
   Bot,
@@ -8,7 +9,12 @@ import {
   ThumbsDown,
   RotateCcw,
   Send,
+  Edit2,
+  Check,
+  X,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import userAvatar from "../assets/default-avatar.svg";
 import Sidebar from "../components/Sidebar";
 import {
@@ -17,14 +23,271 @@ import {
   geminiService,
 } from "../lib/gemini";
 import PreferencesWidget from "../components/PreferencesWidget";
-import DestinationSelector from "../components/DestinationSelector";
+import PreferencesFolded from "../components/PreferencesFolded";
+import Destinations from "../pages/Destinations";
+import { useTrips } from "../contexts/TripsContext";
+import { firebaseChatService } from "../lib/firebaseService";
+
+// Trip Confirmation Dialog Component with Inline Editing
+const TripConfirmationDialog = ({ tripContext, onConfirm, onUpdate }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedContext, setEditedContext] = useState(tripContext);
+
+  const handleEdit = () => {
+    setIsEditing(true);
+    setEditedContext({ ...tripContext });
+  };
+
+  const handleSave = () => {
+    onUpdate(editedContext);
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditedContext({ ...tripContext });
+    setIsEditing(false);
+  };
+
+  const handleFieldChange = (field, value) => {
+    setEditedContext(prev => ({
+      ...prev,
+      [field]: field === 'travelers' ? parseInt(value) || 0 : value
+    }));
+  };
+
+  return (
+    <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-6 mb-4 shadow-sm">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-purple-900">📋 Trip Summary</h3>
+        {!isEditing && (
+          <Button
+            onClick={handleEdit}
+            variant="ghost"
+            size="sm"
+            className="text-purple-600 hover:text-purple-800"
+          >
+            <Edit2 className="w-4 h-4 mr-1" />
+            Edit
+          </Button>
+        )}
+      </div>
+
+      <div className="space-y-4 mb-6">
+        {/* Destination */}
+        <div className="flex items-center gap-3">
+          <span className="font-medium text-purple-800 min-w-[120px]">📍 Destination:</span>
+          {isEditing ? (
+            <Input
+              value={editedContext.destination || ''}
+              onChange={(e) => handleFieldChange('destination', e.target.value)}
+              placeholder="Enter destination"
+              className="flex-1 border-purple-200 focus:border-purple-400"
+            />
+          ) : (
+            <span className="text-purple-700 flex-1">{tripContext.destination || 'Not specified'}</span>
+          )}
+        </div>
+
+        {/* Start Location */}
+        <div className="flex items-center gap-3">
+          <span className="font-medium text-purple-800 min-w-[120px]">🚀 From:</span>
+          {isEditing ? (
+            <Input
+              value={editedContext.startLocation || ''}
+              onChange={(e) => handleFieldChange('startLocation', e.target.value)}
+              placeholder="Enter start location"
+              className="flex-1 border-purple-200 focus:border-purple-400"
+            />
+          ) : (
+            <span className="text-purple-700 flex-1">{tripContext.startLocation || 'Not specified'}</span>
+          )}
+        </div>
+
+        {/* Travelers */}
+        <div className="flex items-center gap-3">
+          <span className="font-medium text-purple-800 min-w-[120px]">👥 Travelers:</span>
+          {isEditing ? (
+            <Input
+              type="number"
+              min="1"
+              value={editedContext.travelers || ''}
+              onChange={(e) => handleFieldChange('travelers', e.target.value)}
+              placeholder="Number of travelers"
+              className="flex-1 border-purple-200 focus:border-purple-400"
+            />
+          ) : (
+            <span className="text-purple-700 flex-1">{tripContext.travelers || 'Not specified'}</span>
+          )}
+        </div>
+
+        {/* Duration/Dates */}
+        <div className="flex items-center gap-3">
+          <span className="font-medium text-purple-800 min-w-[120px]">📅 Duration:</span>
+          {isEditing ? (
+            <Input
+              value={editedContext.duration || editedContext.startDate || ''}
+              onChange={(e) => handleFieldChange('duration', e.target.value)}
+              placeholder="Duration (e.g., 5 days) or start date"
+              className="flex-1 border-purple-200 focus:border-purple-400"
+            />
+          ) : (
+            <span className="text-purple-700 flex-1">{tripContext.duration || tripContext.startDate || 'Not specified'}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex gap-3">
+        {isEditing ? (
+          <>
+            <Button
+              onClick={handleSave}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              <Check className="w-4 h-4 mr-1" />
+              Save Changes
+            </Button>
+            <Button
+              onClick={handleCancel}
+              variant="outline"
+              className="border-gray-300 text-gray-700 hover:bg-gray-50"
+            >
+              <X className="w-4 h-4 mr-1" />
+              Cancel
+            </Button>
+          </>
+        ) : (
+          <Button
+            onClick={onConfirm}
+            className="bg-purple-600 hover:bg-purple-700 text-white"
+          >
+            ✅ Continue to Preferences
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const Chat = () => {
   const navigate = useNavigate();
+  const { chatId } = useParams();
+  const { saveTrip } = useTrips();
   const [messages, setMessages] = useState([]);
+  const [currentChatId, setCurrentChatId] = useState(chatId || uuidv4());
 
+  // Redirect to UUID-based URL if no chatId in URL
+  useEffect(() => {
+    if (!chatId && currentChatId) {
+      navigate(`/chat/${currentChatId}`, { replace: true });
+    }
+  }, [chatId, currentChatId, navigate]);
+
+  // Load or reset chat state when chatId changes
+  useEffect(() => {
+    if (chatId && chatId !== currentChatId) {
+      const loadChatData = async () => {
+        try {
+          // Try to load from Firebase first
+          const chatData = await firebaseChatService.getChat(chatId);
+          if (chatData) {
+            // Restore chat state from Firebase
+            setMessages(chatData.messages || []);
+            setTripContext(chatData.tripContext || {
+              destination: '',
+              startLocation: '',
+              startDate: '',
+              endDate: '',
+              duration: '',
+              travelers: 0,
+              isComplete: false
+            });
+            setSelectedPreferences(chatData.preferences || []);
+            
+            // Determine current state based on data
+            if (chatData.destinations && chatData.destinations.length > 0) {
+              setShowDestinations(true);
+            } else if (chatData.preferences && chatData.preferences.length > 0) {
+              setPreferencesShown(true);
+            }
+            
+            setHasUserInteracted(true);
+          } else {
+            // No Firebase data, check sessionStorage
+            const storedMessages = JSON.parse(sessionStorage.getItem(`messages_${chatId}`) || '[]');
+            const storedContext = JSON.parse(sessionStorage.getItem(`tripContext_${chatId}`) || '{}');
+            const storedPreferences = JSON.parse(localStorage.getItem(`selectedPreferences_${chatId}`) || '[]');
+            const storedUIState = JSON.parse(sessionStorage.getItem(`ui_state_${chatId}`) || '{}');
+            
+            if (storedMessages.length > 0 || Object.keys(storedContext).length > 0) {
+              setMessages(storedMessages);
+              setTripContext(storedContext);
+              setSelectedPreferences(storedPreferences);
+              setHasUserInteracted(true);
+              
+              // Restore UI state
+              setPreferencesShown(storedUIState.preferencesShown || false);
+              setShowDestinations(storedUIState.showDestinations || false);
+              setShowSummaryConfirmation(storedUIState.showSummaryConfirmation || false);
+              setIsVibeExpanded(storedUIState.isVibeExpanded || false);
+            } else {
+              // Fresh start - clear any existing preferences for this chat
+              setMessages([]);
+              setTripContext({
+                destination: '',
+                startLocation: '',
+                startDate: '',
+                endDate: '',
+                duration: '',
+                travelers: 0,
+                isComplete: false
+              });
+              setSelectedPreferences([]);
+              setPreferencesShown(false);
+              setShowDestinations(false);
+              setShowSummaryConfirmation(false);
+              setHasUserInteracted(false);
+              
+              // Clear any existing preferences for this chat
+              localStorage.removeItem(`selectedPreferences_${chatId}`);
+              sessionStorage.removeItem(`selectedPreferences_${chatId}`);
+            }
+          }
+        } catch (error) {
+          console.error('Error loading chat data:', error);
+          // Fallback to fresh start
+          setMessages([]);
+          setTripContext({
+            destination: '',
+            startLocation: '',
+            startDate: '',
+            endDate: '',
+            duration: '',
+            travelers: 0,
+            isComplete: false
+          });
+          setSelectedPreferences([]);
+          setPreferencesShown(false);
+          setShowDestinations(false);
+          setShowSummaryConfirmation(false);
+          setHasUserInteracted(false);
+          
+          // Clear any existing preferences for this chat
+          localStorage.removeItem(`selectedPreferences_${chatId}`);
+          sessionStorage.removeItem(`selectedPreferences_${chatId}`);
+        }
+        
+        // Update current chat ID
+        setCurrentChatId(chatId);
+        sessionStorage.setItem('currentChatId', chatId);
+      };
+      
+      loadChatData();
+    }
+  }, [chatId, currentChatId]);
   const [newMessage, setNewMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
   const [isGeminiInitialized, setIsGeminiInitialized] = useState(false);
   const [error, setError] = useState(null);
   const [isVibeExpanded, setIsVibeExpanded] = useState(false);
@@ -32,7 +295,23 @@ const Chat = () => {
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedExperiences, setSelectedExperiences] = useState([]);
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
+  const [showDestinations, setShowDestinations] = useState(false);
+  const [showSummaryConfirmation, setShowSummaryConfirmation] = useState(false);
+  const [selectedPreferences, setSelectedPreferences] = useState([]);
   const messagesEndRef = useRef(null);
+
+  // Persist UI state
+  useEffect(() => {
+    if (currentChatId) {
+      const uiState = {
+        preferencesShown,
+        showDestinations,
+        showSummaryConfirmation,
+        isVibeExpanded
+      };
+      sessionStorage.setItem(`ui_state_${currentChatId}`, JSON.stringify(uiState));
+    }
+  }, [preferencesShown, showDestinations, showSummaryConfirmation, isVibeExpanded, currentChatId]);
 
   // Utilities: normalize natural date strings and compute duration
   const normalizeDateString = (value) => {
@@ -93,25 +372,39 @@ const Chat = () => {
       try {
         const initialized = await initializeGemini();
         setIsGeminiInitialized(initialized);
-        if (!initialized) {
-          setError(
-            "Gemini API is not configured. Please add your API key to the .env file."
-          );
-        }
+        
         if (initialized) {
-          // Load persisted context if any
+          // Load persisted context for this chat
           try {
-            const persisted = sessionStorage.getItem("tripContext");
+            const chatKey = `tripContext_${currentChatId}`;
+            const persisted = sessionStorage.getItem(chatKey);
             if (persisted) {
               setTripContext(JSON.parse(persisted));
             }
+            
+            // Load messages for this chat
+            const messagesKey = `messages_${currentChatId}`;
+            const persistedMessages = sessionStorage.getItem(messagesKey);
+            if (persistedMessages) {
+              setMessages(JSON.parse(persistedMessages));
+            } else {
+              // Check for initial trip description and create contextual greeting
+              const initialDescription = localStorage.getItem('initialTripDescription');
+              let greeting;
+              
+              if (initialDescription) {
+                greeting = `Great! I see you're interested in: "${initialDescription}"\n\nLet me ask you a few quick questions to plan your perfect trip! 🌟\n\nFirst, which specific destination in India are you most excited about?`;
+                localStorage.removeItem('initialTripDescription');
+              } else {
+                greeting = geminiService.getInitialGreeting();
+              }
+              
+              setMessages([
+                { type: "ai", content: greeting, timestamp: new Date() },
+              ]);
+            }
           } catch {}
 
-          // Show model's initial greeting as first message
-          const greeting = geminiService.getInitialGreeting();
-          setMessages([
-            { type: "ai", content: greeting, timestamp: new Date() },
-          ]);
         }
       } catch (error) {
         console.error("Failed to initialize Gemini:", error);
@@ -120,7 +413,7 @@ const Chat = () => {
     };
 
     initGemini();
-  }, []);
+  }, [currentChatId]);
 
   // Auto-scroll to bottom with smooth animation
   const scrollToBottom = () => {
@@ -239,9 +532,10 @@ const Chat = () => {
       newContext.travelers = 2;
     }
 
-    // Persist on every extraction
+    // Persist on every extraction for this specific chat
     try {
-      sessionStorage.setItem("tripContext", JSON.stringify(newContext));
+      const chatKey = `tripContext_${currentChatId}`;
+      sessionStorage.setItem(chatKey, JSON.stringify(newContext));
     } catch {}
 
     return newContext;
@@ -254,24 +548,38 @@ const Chat = () => {
     }
 
     try {
-      // Send message to Gemini and get response
-      const aiResponse = await sendMessageToGemini(message, tripContext);
+      // Send message to Gemini with full conversation history
+      setIsThinking(true);
+      const geminiResult = await sendMessageToGemini(message, tripContext, messages);
 
-      // Extract information from user's message
-      const updatedContext = extractTripInfo(message, tripContext);
+      // Handle both old string response and new object response
+      const aiResponse = typeof geminiResult === 'string' ? geminiResult : geminiResult.response;
+      const updatedContext = typeof geminiResult === 'string' ? extractTripInfo(message, tripContext) : geminiResult.updatedContext;
+      
       setTripContext(updatedContext);
 
-      // If Gemini indicates all information is collected, show preferences after the response
+      // Check if all essential information is collected
+      const hasAllInfo = updatedContext.destination && 
+                        updatedContext.startLocation && 
+                        (updatedContext.startDate || updatedContext.duration) && 
+                        updatedContext.travelers > 0;
+
+      // If Gemini indicates all information is collected or we have all info, show confirmation
       if (
         aiResponse
           .toLowerCase()
-          .includes("let's move on to your travel preferences")
+          .includes("let me show you a summary for confirmation") ||
+        hasAllInfo
       ) {
         updatedContext.isComplete = true;
         setTripContext(updatedContext);
 
+        // Show summary confirmation
+        setShowSummaryConfirmation(true);
+
         try {
-          sessionStorage.setItem("tripContext", JSON.stringify(updatedContext));
+          const chatKey = `tripContext_${currentChatId}`;
+          sessionStorage.setItem(chatKey, JSON.stringify(updatedContext));
         } catch {}
 
         // Ensure duration is computed if dates are present
@@ -287,10 +595,8 @@ const Chat = () => {
           if (computed) {
             updatedContext.duration = computed;
             try {
-              sessionStorage.setItem(
-                "tripContext",
-                JSON.stringify(updatedContext)
-              );
+              const chatKey = `tripContext_${currentChatId}`;
+              sessionStorage.setItem(chatKey, JSON.stringify(updatedContext));
             } catch {}
             setTripContext({ ...updatedContext });
           }
@@ -299,6 +605,7 @@ const Chat = () => {
         // Persist a concise trip plan for later use (destination for API keys, etc.)
         try {
           const tripPlan = {
+            chatId: currentChatId,
             destination: updatedContext.destination || "",
             startLocation: updatedContext.startLocation || "",
             startDate: updatedContext.startDate || "",
@@ -307,19 +614,19 @@ const Chat = () => {
             travelers: updatedContext.travelers || 0,
             createdAt: new Date().toISOString(),
           };
-          sessionStorage.setItem("tripPlan", JSON.stringify(tripPlan));
+          sessionStorage.setItem(`tripPlan_${currentChatId}`, JSON.stringify(tripPlan));
         } catch {}
 
-        // Set flag to show preferences after the AI response is displayed
-        setTimeout(() => {
-          setPreferencesShown(true);
-        }, 2000); // Wait 2 seconds after the AI response appears
+        // Preferences will only be shown when user clicks Continue in confirmation dialog
+        // Removed automatic preferences showing for better UX control
       }
 
       return aiResponse;
     } catch (error) {
       console.error("Error processing message:", error);
       throw error;
+    } finally {
+      setIsThinking(false);
     }
   };
 
@@ -331,7 +638,14 @@ const Chat = () => {
       content: newMessage,
       timestamp: new Date(),
     };
-    setMessages((prev) => [...prev, userMessage]);
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
+
+    // Persist messages for this chat
+    try {
+      const messagesKey = `messages_${currentChatId}`;
+      sessionStorage.setItem(messagesKey, JSON.stringify(updatedMessages));
+    } catch {}
 
     const messageContent = newMessage;
     setNewMessage("");
@@ -342,14 +656,22 @@ const Chat = () => {
     try {
       const aiResponse = await processMessage(messageContent);
       setTimeout(() => {
-        setMessages((prev) => [
-          ...prev,
+        const finalMessages = [
+          ...updatedMessages,
           {
             type: "ai",
             content: aiResponse,
             timestamp: new Date(),
           },
-        ]);
+        ];
+        setMessages(finalMessages);
+        
+        // Persist updated messages
+        try {
+          const messagesKey = `messages_${currentChatId}`;
+          sessionStorage.setItem(messagesKey, JSON.stringify(finalMessages));
+        } catch {}
+        
         setIsTyping(false);
       }, 800);
     } catch (error) {
@@ -361,15 +683,23 @@ const Chat = () => {
       );
 
       setTimeout(() => {
-        setMessages((prev) => [
-          ...prev,
+        const finalMessages = [
+          ...updatedMessages,
           {
             type: "ai",
             content:
               "Oops! Something went wrong on my end. Mind giving that another shot? 🔄",
             timestamp: new Date(),
           },
-        ]);
+        ];
+        setMessages(finalMessages);
+        
+        // Persist updated messages
+        try {
+          const messagesKey = `messages_${currentChatId}`;
+          sessionStorage.setItem(messagesKey, JSON.stringify(finalMessages));
+        } catch {}
+        
         setIsTyping(false);
       }, 500);
     }
@@ -382,16 +712,12 @@ const Chat = () => {
     }
   };
 
-  const [showDestinationSelector, setShowDestinationSelector] = useState(false);
-
   const processItinerary = async (destinations: any[]) => {
     // Here you would integrate with your itinerary generation logic
     // For now, we'll add a placeholder itinerary message
-    setMessages((prev) => [
-      ...prev,
-      {
-        type: "ai",
-        content: `✨ Your personalized itinerary is ready! ✨
+    const itineraryMessage = {
+      type: "ai",
+      content: `✨ Your personalized itinerary is ready! ✨
 
 ${tripContext.duration} in ${tripContext.destination}
 🗓️ ${tripContext.startDate} to ${tripContext.endDate}
@@ -410,14 +736,23 @@ Day ${index + 1}-${index + 2}: ${dest.name}
   .join("\n")}
 
 Would you like me to provide more details about any specific destination or day? 🌟`,
-        timestamp: new Date(),
-      },
-    ]);
+      timestamp: new Date(),
+    };
+    
+    const updatedMessages = [...messages, itineraryMessage];
+    setMessages(updatedMessages);
+    
+    // Persist updated messages
+    try {
+      const messagesKey = `messages_${currentChatId}`;
+      sessionStorage.setItem(messagesKey, JSON.stringify(updatedMessages));
+    } catch {}
   };
 
   // Handle completion of preferences selection
   const handlePreferencesComplete = (pickedIds: string[]) => {
     const tripData = {
+      chatId: currentChatId,
       destination: tripContext.destination,
       from: tripContext.startLocation,
       startDate: tripContext.startDate,
@@ -428,21 +763,20 @@ Would you like me to provide more details about any specific destination or day?
     };
 
     try {
-      sessionStorage.setItem("tripData", JSON.stringify(tripData));
+      sessionStorage.setItem(`tripData_${currentChatId}`, JSON.stringify(tripData));
     } catch (e) {
-      console.log("SessionStorage not available");
+      // SessionStorage not available
     }
 
-    setMessages((prev) => [
-      ...prev,
-      {
-        type: "user",
-        content: "Perfect! I've selected my preferences!",
-        timestamp: new Date(),
-      },
-      {
-        type: "ai",
-        content: `🚀 Fantastic choices! Based on your ${pickedIds.length} selected preferences, I can suggest some amazing places in ${tripContext.destination} that you'll love. 
+    const userMessage = {
+      type: "user",
+      content: "Perfect! I've selected my preferences!",
+      timestamp: new Date(),
+    };
+    
+    const aiMessage = {
+      type: "ai",
+      content: `🚀 Fantastic choices! Based on your ${pickedIds.length} selected preferences, I can suggest some amazing places in ${tripContext.destination} that you'll love. 
 
 Let's move on to selecting your destinations! I'll help you:
 - Pick the best locations that match your interests
@@ -451,34 +785,178 @@ Let's move on to selecting your destinations! I'll help you:
 - Find hidden gems along the way
 
 Ready to map out your adventure? Let's pick your destinations! 🗺️✨`,
-        timestamp: new Date(),
-      },
-    ]);
+      timestamp: new Date(),
+    };
 
-    setShowDestinationSelector(true);
+    const updatedMessages = [...messages, userMessage, aiMessage];
+    setMessages(updatedMessages);
+    
+    // Persist updated messages
+    try {
+      const messagesKey = `messages_${currentChatId}`;
+      sessionStorage.setItem(messagesKey, JSON.stringify(updatedMessages));
+    } catch {}
+
+    setShowDestinations(true);
+    setPreferencesShown(false); // Hide preferences to show PreferencesFolded
   };
 
-  const handleDestinationsComplete = (destinations: any[]) => {
+  const handleSummaryConfirm = async () => {
+    setShowSummaryConfirmation(false);
+    
+    // Add user confirmation message
+    const userMessage = {
+      type: "user",
+      content: "✅ Perfect! These details look good. Let's continue!",
+      timestamp: new Date(),
+    };
+    
+    // Add AI summary message
+    const summaryMessage = {
+      type: "ai",
+      content: `Your Trip Summary
+
+Destination: ${tripContext.destination}
+Departure City: ${tripContext.startLocation}  
+Duration: ${tripContext.duration || tripContext.startDate}
+Number of Travelers: ${tripContext.travelers}
+
+Thank you for providing your travel details. Now let's personalize your experience by selecting your travel preferences. This will help me suggest the most suitable places and activities for your ${tripContext.destination} journey.`,
+      timestamp: new Date(),
+    };
+
+    const updatedMessages = [...messages, userMessage, summaryMessage];
+    setMessages(updatedMessages);
+    
+    // Persist updated messages
+    try {
+      const messagesKey = `messages_${currentChatId}`;
+      sessionStorage.setItem(messagesKey, JSON.stringify(updatedMessages));
+    } catch {}
+
+    // Show preferences after a brief delay
+    setTimeout(() => {
+      setPreferencesShown(true);
+    }, 1000);
+    
+    // Generate chat title using Gemini
+    try {
+      const title = await geminiService.generateChatTitle(tripContext);
+    } catch (error) {
+      console.error('Failed to generate chat title:', error);
+    }
+  };
+
+  const handleSummaryEdit = () => {
+    setShowSummaryConfirmation(false);
+    // User can continue the conversation to edit details
+  };
+
+  // Handle trip context updates and re-validate with Gemini
+  const handleTripContextUpdate = async (updatedContext) => {
+    try {
+      // Persist updated context
+      const chatKey = `tripContext_${currentChatId}`;
+      sessionStorage.setItem(chatKey, JSON.stringify(updatedContext));
+
+      // Check if all essential information is still complete
+      const hasAllInfo = updatedContext.destination && 
+                        updatedContext.startLocation && 
+                        (updatedContext.startDate || updatedContext.duration) && 
+                        updatedContext.travelers > 0;
+
+      if (!hasAllInfo) {
+        // If information is incomplete, ask Gemini to continue conversation
+        const missingInfo = [];
+        if (!updatedContext.destination) missingInfo.push('destination');
+        if (!updatedContext.startLocation) missingInfo.push('start location');
+        if (!updatedContext.startDate && !updatedContext.duration) missingInfo.push('travel dates');
+        if (!updatedContext.travelers || updatedContext.travelers <= 0) missingInfo.push('number of travelers');
+
+        const contextMessage = `I've updated my trip details. Here's what I have now: 
+${updatedContext.destination ? `Destination: ${updatedContext.destination}` : ''}
+${updatedContext.startLocation ? `From: ${updatedContext.startLocation}` : ''}
+${updatedContext.duration || updatedContext.startDate ? `Duration: ${updatedContext.duration || updatedContext.startDate}` : ''}
+${updatedContext.travelers ? `Travelers: ${updatedContext.travelers}` : ''}
+
+Please help me complete the missing information.`;
+
+        // Hide confirmation dialog and continue conversation
+        setShowSummaryConfirmation(false);
+        
+        // Set the message and send it
+        setNewMessage(contextMessage);
+        setTimeout(async () => {
+          await handleSendMessage();
+        }, 100);
+      }
+    } catch (error) {
+      console.error('Error updating trip context:', error);
+    }
+  };
+
+  // Handle preferences expansion - reopen preferences component
+  const handlePreferencesExpand = () => {
+    setPreferencesShown(true);
+    // Keep destinations visible so user can see real-time updates
+    // setShowDestinations(false); // Removed this line
+    setShowSummaryConfirmation(false);
+  };
+
+  // Update selected preferences and sync with destinations
+  const updateSelectedPreferences = (preferences) => {
+    setSelectedPreferences(preferences);
+    // Save to sessionStorage for real-time sync
+    const tripData = JSON.parse(sessionStorage.getItem(`tripData_${currentChatId}`) || '{}');
+    tripData.preferences = preferences;
+    sessionStorage.setItem(`tripData_${currentChatId}`, JSON.stringify(tripData));
+    
+    // Save to chat-specific localStorage
+    if (currentChatId) {
+      localStorage.setItem(`selectedPreferences_${currentChatId}`, JSON.stringify(preferences));
+    }
+  };
+
+  const handleDestinationsComplete = async (destinations: any[]) => {
     try {
       const finalTripData = {
-        ...JSON.parse(sessionStorage.getItem("tripData") || "{}"),
+        ...JSON.parse(sessionStorage.getItem(`tripData_${currentChatId}`) || "{}"),
         finalDestinations: destinations,
       };
-      sessionStorage.setItem("finalTripData", JSON.stringify(finalTripData));
+      sessionStorage.setItem(`finalTripData_${currentChatId}`, JSON.stringify(finalTripData));
+      
+      // Generate chat title using Gemini
+      let tripTitle = `${tripContext.destination} Trip`;
+      try {
+        tripTitle = await geminiService.generateChatTitle(tripContext);
+      } catch (error) {
+        console.error('Failed to generate chat title:', error);
+      }
+      
+      // Save trip to context
+      saveTrip({
+        chatId: currentChatId,
+        title: tripTitle,
+        destinations: destinations.map(d => d.name),
+        startDate: tripContext.startDate || new Date().toISOString(),
+        endDate: tripContext.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        travelers: tripContext.travelers,
+        preferences: finalTripData.preferences || [],
+        chatData: tripContext, // Store full chat data for future reference
+      });
     } catch (e) {
-      console.log("SessionStorage not available");
+      // SessionStorage not available
     }
 
-    setMessages((prev) => [
-      ...prev,
-      {
-        type: "user",
-        content: "I've selected my destinations!",
-        timestamp: new Date(),
-      },
-      {
-        type: "ai",
-        content: `Perfect! I'm now crafting your personalized itinerary for ${tripContext.destination}. I'll help you explore: 🗺️
+    const userMessage = {
+      type: "user",
+      content: "I've selected my destinations!",
+      timestamp: new Date(),
+    };
+    
+    const aiMessage = {
+      type: "ai",
+      content: `Perfect! I'm now crafting your personalized itinerary for ${tripContext.destination}. I'll help you explore: 🗺️
 
 1. Detailed day-by-day plans for each destination
 2. Local attractions and hidden gems
@@ -487,19 +965,25 @@ Ready to map out your adventure? Let's pick your destinations! 🗺️✨`,
 5. Local cuisine and dining suggestions
 
 I'm putting all of this together into a comprehensive travel plan. Just give me a moment... ✨`,
-        timestamp: new Date(),
-      },
-    ]);
+      timestamp: new Date(),
+    };
 
-    setShowDestinationSelector(false);
+    const updatedMessages = [...messages, userMessage, aiMessage];
+    setMessages(updatedMessages);
+    
+    // Persist updated messages
+    try {
+      const messagesKey = `messages_${currentChatId}`;
+      sessionStorage.setItem(messagesKey, JSON.stringify(updatedMessages));
+    } catch {}
+
+    setShowDestinations(false);
 
     // Add a small delay before showing the processing message
     setTimeout(() => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          type: "ai",
-          content: `I'm excited to create your personalized itinerary! 🎨 
+      const processingMessage = {
+        type: "ai",
+        content: `I'm excited to create your personalized itinerary! 🎨 
 
 Here's what I'm planning for each destination:
 • Organizing activities based on your interests
@@ -509,9 +993,17 @@ Here's what I'm planning for each destination:
 • Adding some flexibility for spontaneous exploration
 
 Your detailed travel plan will be ready in just a moment... 🌟`,
-          timestamp: new Date(),
-        },
-      ]);
+        timestamp: new Date(),
+      };
+      
+      const finalMessages = [...updatedMessages, processingMessage];
+      setMessages(finalMessages);
+      
+      // Persist updated messages
+      try {
+        const messagesKey = `messages_${currentChatId}`;
+        sessionStorage.setItem(messagesKey, JSON.stringify(finalMessages));
+      } catch {}
 
       // This is where you would integrate with your itinerary generation logic
       // For now, we'll simulate processing time
@@ -607,27 +1099,47 @@ Your detailed travel plan will be ready in just a moment... 🌟`,
             </div>
           ))}
 
+          {showSummaryConfirmation && (
+            <TripConfirmationDialog 
+              tripContext={tripContext}
+              onConfirm={handleSummaryConfirm}
+              onUpdate={(updatedContext) => {
+                setTripContext(updatedContext);
+                // Re-validate with Gemini if needed
+                handleTripContextUpdate(updatedContext);
+              }}
+            />
+          )}
+
           {preferencesShown &&
             tripContext.destination &&
-            !showDestinationSelector && (
+            !showDestinations && (
               <PreferencesWidget
                 destination={tripContext.destination}
                 onComplete={handlePreferencesComplete}
+                onPreferencesChange={updateSelectedPreferences}
               />
             )}
 
-          {showDestinationSelector && (
+          {/* Show PreferencesFolded when user is on destinations or beyond, but NOT when preferences are currently shown */}
+          {showDestinations && !preferencesShown && (
+            <PreferencesFolded 
+              preferences={selectedPreferences} 
+              onExpand={handlePreferencesExpand}
+            />
+          )}
+
+          {showDestinations && (
             <div className="mt-4">
-              <DestinationSelector
+              <Destinations
                 tripData={{
                   destination: tripContext.destination,
-                  from: tripContext.startLocation,
+                  startLocation: tripContext.startLocation,
                   duration: tripContext.duration,
-                  travelTime: tripContext.startDate,
+                  startDate: tripContext.startDate,
+                  endDate: tripContext.endDate,
                   travelers: tripContext.travelers,
-                  preferences:
-                    JSON.parse(sessionStorage.getItem("tripData") || "{}")
-                      .preferences || [],
+                  preferences: selectedPreferences,
                 }}
                 onComplete={handleDestinationsComplete}
               />
@@ -640,6 +1152,16 @@ Your detailed travel plan will be ready in just a moment... 🌟`,
                 <div className="w-2 h-2 bg-slate-300 dark:bg-slate-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
                 <div className="w-2 h-2 bg-slate-300 dark:bg-slate-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
                 <div className="w-2 h-2 bg-slate-300 dark:bg-slate-600 rounded-full animate-bounce"></div>
+              </div>
+            </div>
+          )}
+
+          {isThinking && (
+            <div className="flex items-center gap-3">
+              <div className="flex space-x-2 bg-white dark:bg-slate-800 rounded-lg p-3">
+                <div className="w-2 h-2 bg-purple-300 dark:bg-purple-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                <div className="w-2 h-2 bg-purple-300 dark:bg-purple-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                <div className="w-2 h-2 bg-purple-300 dark:bg-purple-600 rounded-full animate-bounce"></div>
               </div>
             </div>
           )}
