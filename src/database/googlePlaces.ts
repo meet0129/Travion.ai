@@ -57,7 +57,8 @@ export type PlaceItem = {
 
 const photoUrl = (photoRef?: string, apiKey?: string) => {
   if (!photoRef || !apiKey) return undefined;
-  return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${photoRef}&key=${apiKey}`;
+  // Use the new Places API photo endpoint
+  return `https://places.googleapis.com/v1/${photoRef}/media?maxWidthPx=400&key=${apiKey}`;
 };
 
 // Helper function to get price range from price level
@@ -87,8 +88,10 @@ const normalizePlaceData = (place: any, apiKey: string, category?: string): Plac
     photoUrl: isNewAPI ? 
       (place.photos?.[0]?.name ? 
         `https://places.googleapis.com/v1/${place.photos[0].name}/media?maxWidthPx=400&key=${apiKey}` :
-        photoUrl(place.photos?.[0]?.photo_reference, apiKey)) :
-      photoUrl(place.photos?.[0]?.photo_reference, apiKey),
+        undefined) :
+      (place.photos?.[0]?.photo_reference ? 
+        `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${place.photos[0].photo_reference}&key=${apiKey}` :
+        undefined),
     priceLevel: isNewAPI ? place.priceLevel : place.price_level,
     types: place.types,
     location: isNewAPI ? 
@@ -135,17 +138,14 @@ const normalizePlaceData = (place: any, apiKey: string, category?: string): Plac
 };
 
 export async function geocodeDestination(destination: string, _apiKey: string): Promise<LatLng | null> {
-  console.log('🌍 Geocoding destination:', destination);
   try {
     const data: any = await callPlacesProxy({ action: 'textsearch', query: destination });
-    console.log('📍 Geocoding response:', data);
     
     // Handle both new API and legacy API response formats
     const places = data?.places || data?.results || [];
     const first = places[0];
     
     if (!first) {
-      console.warn('❌ No places found for destination:', destination);
       return null;
     }
     
@@ -155,16 +155,13 @@ export async function geocodeDestination(destination: string, _apiKey: string): 
         lat: first.location.latitude || first.location.lat,
         lng: first.location.longitude || first.location.lng
       };
-      console.log('✅ Geocoding successful (new API):', location);
       return location;
     }
     
     // Legacy API format
     const location = first.geometry?.location || null;
-    console.log('✅ Geocoding successful (legacy API):', location);
     return location;
   } catch (error) {
-    console.error('❌ Geocoding failed:', error);
     return null;
   }
 }
@@ -274,7 +271,6 @@ export async function nearbyByCategory(
         break;
       }
     } catch (error) {
-      console.warn(`Failed to fetch places for category ${category} with params:`, params, error);
       // Continue to next search parameter
     }
   }
@@ -298,7 +294,7 @@ export async function nearbyByCategory(
         }
       }
     } catch (error) {
-      console.warn(`Failed to fetch places with text search for category ${category}:`, error);
+      // Text search failed, continue
     }
   }
   
@@ -394,7 +390,6 @@ export async function fetchAllCategoriesForDestination(destination: string, apiK
   try {
     const loc = await geocodeDestination(destination, apiKey);
     if (!loc) {
-      console.warn(`Could not geocode destination: ${destination}`);
       return { attractions: [], day_trips: [], food_cafes: [], hidden_gems: [] };
     }
     
@@ -412,7 +407,6 @@ export async function fetchAllCategoriesForDestination(destination: string, apiK
       hidden_gems: hiddenGems.status === 'fulfilled' ? hiddenGems.value : []
     };
   } catch (error) {
-    console.error(`Error fetching categories for destination ${destination}:`, error);
     return { attractions: [], day_trips: [], food_cafes: [], hidden_gems: [] };
   }
 }
@@ -461,7 +455,6 @@ export async function similarPlacesByPlace(
 
     return filtered.slice(0, limit);
   } catch (error) {
-    console.error(`Error fetching similar places for ${base.name}:`, error);
     return [];
   }
 }

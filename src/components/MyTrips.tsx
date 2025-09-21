@@ -75,8 +75,6 @@ const MyTrips: React.FC<MyTripsProps> = ({ isOpen, onClose }) => {
       } catch (firebaseError) {
         console.error('Failed to save to Firebase:', firebaseError);
       }
-
-      console.log('Current chat saved successfully');
     } catch (error) {
       console.error('Error saving current chat:', error);
     }

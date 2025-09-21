@@ -45,7 +45,6 @@ export class FirebaseChatService {
         createdAt: chatData.createdAt.toISOString(),
         updatedAt: chatData.updatedAt.toISOString(),
       });
-      console.log('Chat saved to Firebase:', chatData.chatId);
     } catch (error) {
       console.error('Error saving chat to Firebase:', error);
       throw error;
@@ -115,7 +114,6 @@ export class FirebaseChatService {
     try {
       const chatRef = doc(db, this.collectionName, chatId);
       await deleteDoc(chatRef);
-      console.log('Chat deleted from Firebase:', chatId);
     } catch (error) {
       console.error('Error deleting chat from Firebase:', error);
       throw error;
@@ -130,7 +128,6 @@ export class FirebaseChatService {
         ...updates,
         updatedAt: new Date().toISOString(),
       }, { merge: true });
-      console.log('Chat updated in Firebase:', chatId);
     } catch (error) {
       console.error('Error updating chat in Firebase:', error);
       throw error;

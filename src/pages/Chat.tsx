@@ -55,7 +55,6 @@ const Chat = () => {
               endDate: '',
               duration: '',
               travelers: 0,
-              budget: '',
               isComplete: false
             });
             setSelectedPreferences(chatData.preferences || []);
@@ -68,7 +67,6 @@ const Chat = () => {
             }
             
             setHasUserInteracted(true);
-            console.log('Chat data loaded from Firebase:', chatId);
           } else {
             // No Firebase data, check sessionStorage
             const storedMessages = JSON.parse(sessionStorage.getItem(`messages_${chatId}`) || '[]');
@@ -80,7 +78,6 @@ const Chat = () => {
               setTripContext(storedContext);
               setSelectedPreferences(storedPreferences);
               setHasUserInteracted(true);
-              console.log('Chat data loaded from sessionStorage:', chatId);
             } else {
               // Fresh start
               setMessages([]);
@@ -91,7 +88,6 @@ const Chat = () => {
                 endDate: '',
                 duration: '',
                 travelers: 0,
-                budget: '',
                 isComplete: false
               });
               setSelectedPreferences([]);
@@ -99,7 +95,6 @@ const Chat = () => {
               setShowDestinations(false);
               setShowSummaryConfirmation(false);
               setHasUserInteracted(false);
-              console.log('Fresh chat started:', chatId);
             }
           }
         } catch (error) {
@@ -113,7 +108,6 @@ const Chat = () => {
             endDate: '',
             duration: '',
             travelers: 0,
-            budget: '',
             isComplete: false
           });
           setSelectedPreferences([]);
@@ -133,6 +127,7 @@ const Chat = () => {
   }, [chatId, currentChatId]);
   const [newMessage, setNewMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
   const [isGeminiInitialized, setIsGeminiInitialized] = useState(false);
   const [error, setError] = useState(null);
   const [isVibeExpanded, setIsVibeExpanded] = useState(false);
@@ -381,6 +376,7 @@ const Chat = () => {
 
     try {
       // Send message to Gemini with full conversation history
+      setIsThinking(true);
       const aiResponse = await sendMessageToGemini(message, tripContext, messages);
 
       // Extract information from user's message
@@ -456,6 +452,8 @@ const Chat = () => {
     } catch (error) {
       console.error("Error processing message:", error);
       throw error;
+    } finally {
+      setIsThinking(false);
     }
   };
 
@@ -594,7 +592,7 @@ Would you like me to provide more details about any specific destination or day?
     try {
       sessionStorage.setItem(`tripData_${currentChatId}`, JSON.stringify(tripData));
     } catch (e) {
-      console.log("SessionStorage not available");
+      // SessionStorage not available
     }
 
     const userMessage = {
@@ -636,7 +634,6 @@ Ready to map out your adventure? Let's pick your destinations! 🗺️✨`,
     // Generate chat title using Gemini
     try {
       const title = await geminiService.generateChatTitle(tripContext);
-      console.log('Generated chat title:', title);
     } catch (error) {
       console.error('Failed to generate chat title:', error);
     }
@@ -692,7 +689,7 @@ Ready to map out your adventure? Let's pick your destinations! 🗺️✨`,
         chatData: tripContext, // Store full chat data for future reference
       });
     } catch (e) {
-      console.log("SessionStorage not available");
+      // SessionStorage not available
     }
 
     const userMessage = {
@@ -866,12 +863,6 @@ Your detailed travel plan will be ready in just a moment... 🌟`,
                   <span className="font-medium text-purple-800">📅 Duration:</span>
                   <span className="text-purple-700">{tripContext.duration || tripContext.startDate || 'Not specified'}</span>
                 </div>
-                {tripContext.budget && (
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-purple-800">💰 Budget:</span>
-                    <span className="text-purple-700">{tripContext.budget}</span>
-                  </div>
-                )}
               </div>
               <div className="flex gap-3">
                 <Button
@@ -932,6 +923,16 @@ Your detailed travel plan will be ready in just a moment... 🌟`,
                 <div className="w-2 h-2 bg-slate-300 dark:bg-slate-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
                 <div className="w-2 h-2 bg-slate-300 dark:bg-slate-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
                 <div className="w-2 h-2 bg-slate-300 dark:bg-slate-600 rounded-full animate-bounce"></div>
+              </div>
+            </div>
+          )}
+
+          {isThinking && (
+            <div className="flex items-center gap-3">
+              <div className="flex space-x-2 bg-white dark:bg-slate-800 rounded-lg p-3">
+                <div className="w-2 h-2 bg-purple-300 dark:bg-purple-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                <div className="w-2 h-2 bg-purple-300 dark:bg-purple-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                <div className="w-2 h-2 bg-purple-300 dark:bg-purple-600 rounded-full animate-bounce"></div>
               </div>
             </div>
           )}
