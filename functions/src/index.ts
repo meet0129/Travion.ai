@@ -138,23 +138,7 @@ export const places = onRequest(async (req, res) => {
           // Try new API first with enhanced fields
           data = await callGooglePlacesAPI("/places:searchText", {
             textQuery: query.toString(),
-            fields: [
-              "displayName",
-              "location", 
-              "rating",
-              "userRatingCount",
-              "photos",
-              "websiteUri",
-              "formattedAddress",
-              "priceLevel",
-              "types",
-              "businessStatus",
-              "reviews",
-              "openingHours",
-              "phoneNumber",
-              "editorialSummary",
-              "primaryType"
-            ],
+            fieldMask: "displayName,location,rating,userRatingCount,photos,websiteUri,formattedAddress,priceLevel,types,businessStatus,reviews,openingHours,phoneNumber,editorialSummary,primaryType",
             maxResultCount: 20,
             minRating: 4.0,
             strictTypeFilter: true
@@ -191,23 +175,7 @@ export const places = onRequest(async (req, res) => {
                 radius: parseFloat(radius)
               }
             },
-            fields: [
-              "displayName",
-              "location", 
-              "rating",
-              "userRatingCount",
-              "photos",
-              "websiteUri",
-              "formattedAddress",
-              "priceLevel",
-              "types",
-              "businessStatus",
-              "reviews",
-              "openingHours",
-              "phoneNumber",
-              "editorialSummary",
-              "primaryType"
-            ],
+            fieldMask: "displayName,location,rating,userRatingCount,photos,websiteUri,formattedAddress,priceLevel,types,businessStatus,reviews,openingHours,phoneNumber,editorialSummary,primaryType",
             maxResultCount: 20,
             minRating: 4.0,
             strictTypeFilter: true
@@ -244,28 +212,7 @@ export const places = onRequest(async (req, res) => {
         try {
           // Try new API first
           data = await callGooglePlacesAPI(`/places/${placeId}`, {
-            fields: [
-              "displayName",
-              "location", 
-              "rating",
-              "userRatingCount",
-              "photos",
-              "websiteUri",
-              "formattedAddress",
-              "priceLevel",
-              "types",
-              "businessStatus",
-              "reviews",
-              "openingHours",
-              "phoneNumber",
-              "editorialSummary",
-              "primaryType",
-              "currentOpeningHours",
-              "regularOpeningHours",
-              "utcOffsetMinutes",
-              "adrFormatAddress",
-              "shortFormattedAddress"
-            ]
+            fieldMask: "displayName,location,rating,userRatingCount,photos,websiteUri,formattedAddress,priceLevel,types,businessStatus,reviews,openingHours,phoneNumber,editorialSummary,primaryType,currentOpeningHours,regularOpeningHours,utcOffsetMinutes,adrFormatAddress,shortFormattedAddress"
           });
         } catch (error) {
           logger.warn("New API failed, falling back to legacy", error);
@@ -286,8 +233,8 @@ export const places = onRequest(async (req, res) => {
           return;
         }
 
-        // For photos, we return the URL since we can't proxy binary data easily
-        const photoUrl = `${GOOGLE_PLACES_LEGACY_URL}/photo?maxwidth=${maxWidth}&photo_reference=${encodeURIComponent(photoReference)}&key=${GOOGLE_PLACES_API_KEY}`;
+        // Use the new Places API photo endpoint
+        const photoUrl = `${GOOGLE_PLACES_BASE_URL}/${photoReference}/media?maxWidthPx=${maxWidth}&key=${GOOGLE_PLACES_API_KEY}`;
         
         res.json({ data: { photoUrl } });
         return;

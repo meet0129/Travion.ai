@@ -15,9 +15,11 @@ type Props = {
   className?: string;
   onHover?: (placeId: string | null) => void;
   selectedPins?: string[]; // Array of selected pin IDs
+  autoZoom?: boolean;
+  smoothAnimations?: boolean;
 };
 
-export default function MapEmbed({ apiKey, pins, center, zoom = 10, className, onHover, selectedPins = [] }: Props) {
+export default function MapEmbed({ apiKey, pins, center, zoom = 10, className, onHover, selectedPins = [], autoZoom = false, smoothAnimations = false }: Props) {
   const ref = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
@@ -46,9 +48,15 @@ export default function MapEmbed({ apiKey, pins, center, zoom = 10, className, o
     mapRef.current = new window.google.maps.Map(ref.current, {
       center: initialCenter,
       zoom,
-      mapTypeControl: false,
-      streetViewControl: false,
-      fullscreenControl: false,
+      disableDefaultUI: true, // Remove all default controls
+      gestureHandling: 'cooperative',
+      styles: [
+        {
+          featureType: 'poi',
+          elementType: 'labels',
+          stylers: [{ visibility: 'off' }]
+        }
+      ]
     });
     infoRef.current = new window.google.maps.InfoWindow();
   }, [center, pins, zoom]);
@@ -72,7 +80,7 @@ export default function MapEmbed({ apiKey, pins, center, zoom = 10, className, o
           position: p.location,
           map: mapRef.current,
           title: p.name,
-          animation: window.google.maps.Animation.DROP,
+          animation: null, // No animation initially
           icon: {
             url: isSelected 
               ? 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
@@ -91,6 +99,16 @@ export default function MapEmbed({ apiKey, pins, center, zoom = 10, className, o
             anchor: new window.google.maps.Point(10, 10)
           }
         });
+        
+        // Add smooth entrance animation
+        if (smoothAnimations) {
+          setTimeout(() => {
+            m.setAnimation(window.google.maps.Animation.DROP);
+            setTimeout(() => {
+              m.setAnimation(null);
+            }, 600); // Stop after 600ms for smoother effect
+          }, 50); // Small delay for better visual effect
+        }
         
         // Add stable event listeners
         m.addListener('mouseover', () => {
@@ -112,17 +130,30 @@ export default function MapEmbed({ apiKey, pins, center, zoom = 10, className, o
         bounds.extend(p.location);
       });
 
-      // Fit bounds with padding to prevent shaking
-      if (pins.length > 1) {
-        mapRef.current.fitBounds(bounds, { 
-          top: 20, 
-          right: 20, 
-          bottom: 20, 
-          left: 20 
-        });
-      } else if (pins.length === 1) {
-        mapRef.current.setCenter(pins[0].location);
-        mapRef.current.setZoom(Math.min(zoom, 12)); // Limit zoom to prevent shaking
+      // Auto-zoom to fit all pins with smooth animation
+      if (autoZoom && pins.length > 0) {
+        setTimeout(() => {
+          if (pins.length > 1) {
+            mapRef.current.fitBounds(bounds, { 
+              top: 50, 
+              right: 50, 
+              bottom: 50, 
+              left: 50 
+            });
+            // Ensure minimum zoom level for better visibility
+            setTimeout(() => {
+              const currentZoom = mapRef.current.getZoom();
+              if (currentZoom > 16) {
+                mapRef.current.setZoom(16);
+              } else if (currentZoom < 8) {
+                mapRef.current.setZoom(8);
+              }
+            }, 500);
+          } else {
+            mapRef.current.setCenter(pins[0].location);
+            mapRef.current.setZoom(12); // Better zoom level for single pin
+          }
+        }, 200); // Delay for smoother transition
       }
     }, 100); // 100ms debounce
 

@@ -42,11 +42,9 @@ export const TripsProvider = ({ children }: TripsProviderProps) => {
   useEffect(() => {
     // Load trips from localStorage
     const savedTrips = localStorage.getItem('savedTrips');
-    console.log('Loading saved trips:', savedTrips);
     if (savedTrips) {
       try {
         const parsedTrips = JSON.parse(savedTrips);
-        console.log('Parsed trips:', parsedTrips);
         setTrips(parsedTrips);
       } catch (error) {
         console.error('Failed to load saved trips:', error);

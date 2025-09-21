@@ -48,17 +48,13 @@ const PreferencesWidget = ({ destination, onComplete, onPreferencesChange }: Pro
       // Debug environment variables
       debugEnvironment();
       
-      console.log('🔍 PreferencesWidget: Starting API call', { destination, apiKey: !!apiKey });
       if (!destination || !apiKey) {
-        console.warn('❌ Missing destination or API key', { destination, apiKey: !!apiKey });
         return;
       }
       setLoading(true);
       setError(null);
       try {
-        console.log('🚀 Calling fetchAllCategoriesForDestination...');
         const result = await fetchAllCategoriesForDestination(destination, apiKey, 6);
-        console.log('✅ API call successful', result);
         if (!cancelled) setData(result as any);
       } catch (e) {
         console.error('❌ API call failed:', e);
@@ -339,7 +335,14 @@ const PreferencesWidget = ({ destination, onComplete, onPreferencesChange }: Pro
             <button
               onClick={() => {
                 const selected = picked.map(id => pickedPlaces[id]).filter(Boolean);
-                localStorage.setItem('selectedPreferences', JSON.stringify(selected));
+                  // Persist globally and per-chat for real-time sync with Destinations and chat sessions
+                try {
+                  localStorage.setItem('selectedPreferences', JSON.stringify(selected));
+                  const currentChatId = sessionStorage.getItem('currentChatId');
+                  if (currentChatId) {
+                    sessionStorage.setItem(`selectedPreferences_${currentChatId}`, JSON.stringify(selected));
+                  }
+                } catch {}
                 onComplete(picked);
               }}
               disabled={picked.length === 0}

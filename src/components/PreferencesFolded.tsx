@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
@@ -9,19 +9,35 @@ interface PreferencesFoldedProps {
 
 const PreferencesFolded: React.FC<PreferencesFoldedProps> = ({ preferences, onExpand }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [localPrefs, setLocalPrefs] = useState<any[]>(preferences || []);
 
   const handleExpand = () => {
     setIsExpanded(!isExpanded);
     onExpand();
   };
 
+  // Live-sync with storage so Destinations/Chat can reflect adds immediately
+  useEffect(() => {
+    setLocalPrefs(preferences || []);
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'selectedPreferences') {
+        try {
+          const next = JSON.parse(e.newValue || '[]');
+          setLocalPrefs(next);
+        } catch {}
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [preferences]);
+
   return (
     <div className="bg-gray-100 rounded-lg p-3 mb-4 border border-gray-200">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-gray-700 font-medium text-sm">Select your vibe</span>
-          {preferences.length > 0 && (
-            <span className="text-gray-500 text-xs">({preferences.length} selected)</span>
+          {localPrefs.length > 0 && (
+            <span className="text-gray-500 text-xs">({localPrefs.length} selected)</span>
           )}
         </div>
         <Button
@@ -48,8 +64,8 @@ const PreferencesFolded: React.FC<PreferencesFoldedProps> = ({ preferences, onEx
         <div className="mt-3 space-y-2">
           <div className="text-xs text-gray-600 mb-2">Selected preferences:</div>
           <div className="flex flex-wrap gap-1">
-            {preferences.length > 0 ? (
-              preferences.map((pref, index) => (
+            {localPrefs.length > 0 ? (
+              localPrefs.map((pref, index) => (
                 <span
                   key={index}
                   className="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-full border border-purple-200"

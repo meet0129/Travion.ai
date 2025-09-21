@@ -58,8 +58,6 @@ const Sidebar = () => {
         preferences: tripData.preferences || [],
         chatData: { tripContext, messages }
       });
-
-      console.log('Current chat saved successfully');
     } catch (error) {
       console.error('Error saving current chat:', error);
     }

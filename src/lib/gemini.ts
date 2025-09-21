@@ -7,9 +7,8 @@ try {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
   if (apiKey && apiKey.trim() !== '') {
     ai = new GoogleGenAI({ apiKey });
-    console.log('✅ Gemini AI initialized successfully');
   } else {
-    console.warn('⚠️ Gemini API key not found. Using fallback responses.');
+    // Gemini API key not found. Using fallback responses.
   }
 } catch (error) {
   console.error('❌ Failed to initialize Gemini AI:', error);
@@ -80,12 +79,7 @@ class GeminiService {
         }
       ];
       
-      // Log initialization status
-      if (ai) {
-        console.log('✅ Gemini service initialized with AI');
-      } else {
-        console.log('⚠️ Gemini service initialized with fallback responses');
-      }
+      // Service initialized
     } catch (error) {
       console.error('Error initializing Gemini service:', error);
       throw new Error('Failed to initialize Gemini service');
@@ -106,7 +100,7 @@ class GeminiService {
         return this.getFallbackResponse(userMessage, tripContext);
       }
 
-      // Build context-aware conversation history
+      // Build context-aware conversation history (dedupe and compress)
       let conversationHistory = [...this.conversationHistory];
       
       // Add previous messages if provided for context awareness
@@ -118,24 +112,23 @@ class GeminiService {
         conversationHistory = [...previousConversation, ...conversationHistory];
       }
 
-      // Create context-aware prompt
-      let contextualPrompt = userMessage;
-      
-      if (tripContext) {
-        const collectedInfo = [];
-        if (tripContext.destination) collectedInfo.push(`Destination: ${tripContext.destination}`);
-        if (tripContext.startDate) collectedInfo.push(`Travel time: ${tripContext.startDate}`);
-        if (tripContext.travelers > 0) collectedInfo.push(`Travelers: ${tripContext.travelers}`);
-        if (tripContext.duration) collectedInfo.push(`Duration: ${tripContext.duration}`);
-        
-        if (collectedInfo.length > 0) {
-          contextualPrompt = `Current trip info: ${collectedInfo.join(', ')}
-          
-User message: ${userMessage}
+      // Guidance: ask only missing info
+      const needDestination = !tripContext?.destination;
+      const needStart = !tripContext?.startLocation;
+      const needDates = !(tripContext?.startDate || tripContext?.duration || tripContext?.endDate);
+      const needTravelers = !(tripContext?.travelers > 0);
+      const haveAll = !needDestination && !needStart && !needDates && !needTravelers;
 
-Respond based on what information is still needed. If you have all essential info (destination, dates, travelers, duration), suggest moving to preferences.`;
-        }
-      }
+      const contextualPrompt = `Rules:
+1) Ask ONLY missing essentials, one concise question at a time.
+2) If nothing missing, reply EXACTLY: "Perfect! I have all the essential details. Let's move on to your travel preferences! 🎯"
+3) Keep replies under 2 short sentences.
+
+Known info: Destination=${tripContext?.destination || '—'}, Start=${tripContext?.startLocation || '—'}, Dates=${tripContext?.startDate || tripContext?.endDate || tripContext?.duration || '—'}, Travelers=${tripContext?.travelers || '—'}
+
+User: ${userMessage}
+
+${haveAll ? 'All essentials present.' : 'Ask only what is missing.'}`;
 
       // Build conversation context for the AI (use structured contents API)
       const contents = this.conversationHistory.map((m) => ({
@@ -145,7 +138,7 @@ Respond based on what information is still needed. If you have all essential inf
 
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
-        contents
+        contents: [...contents, { role: 'user', parts: [{ text: contextualPrompt }] }]
       });
 
       const aiResponse = typeof (response as any).text === 'function' ? (response as any).text() : ((response as any).candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't generate a response. Please try again.");
