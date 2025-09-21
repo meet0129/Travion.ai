@@ -227,7 +227,7 @@ const PreferencesChat = () => {
                   </div>
                   <div className="flex-1">
                     <div className="mb-1">
-                      <span className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Airial</span>
+                      <span className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Travion</span>
                     </div>
                     <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border border-slate-200 dark:border-slate-700 rounded-2xl p-4 shadow-sm">
                       <p className="text-slate-900 dark:text-slate-100 text-sm leading-relaxed whitespace-pre-line">
@@ -285,7 +285,7 @@ const PreferencesChat = () => {
                   </h4>
                   <p className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-2">
                     <Heart className="w-4 h-4 text-red-500 fill-red-500" />
-                    Follow your inspiration — Airial will connect the dots and create a journey filled with moments that feel just right.
+                    Follow your inspiration — Travion will connect the dots and create a journey filled with moments that feel just right.
                   </p>
                 </div>
               )}
@@ -404,7 +404,7 @@ const PreferencesChat = () => {
               <div className="flex-1 flex items-center gap-3">
                 <input 
                   type="text" 
-                  placeholder="Ask Airial ..."
+                  placeholder="Ask Travion ..."
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}

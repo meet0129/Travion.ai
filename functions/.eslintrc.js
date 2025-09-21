@@ -6,11 +6,10 @@ module.exports = {
   },
   extends: [
     "eslint:recommended",
-    "@typescript-eslint/recommended",
+    "google",
   ],
   parser: "@typescript-eslint/parser",
   parserOptions: {
-    project: ["tsconfig.json", "tsconfig.dev.json"],
     sourceType: "module",
   },
   ignorePatterns: [
@@ -19,13 +18,10 @@ module.exports = {
   ],
   plugins: [
     "@typescript-eslint",
-    "import",
   ],
   rules: {
     "quotes": ["error", "double"],
-    "import/no-unresolved": 0,
     "indent": ["error", 2],
-    "@typescript-eslint/no-unused-expressions": "off",
-    "@typescript-eslint/no-explicit-any": "off",
+    "max-len": ["error", {"code": 120}],
   },
 };

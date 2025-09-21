@@ -15,9 +15,9 @@ const NotFound = () => {
       <div className="text-center max-w-md w-full">
         {/* Brand Logo */}
         <div className="flex items-center justify-center gap-2 mb-8">
-          <div className="w-12 h-12 rounded-xl bg-gradient-primary flex items-center justify-center">
-            <span className="text-2xl">✈️</span>
-          </div>
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-purple-600 to-pink-500 flex items-center justify-center">
+          <span className="text-lg">✈️</span>
+        </div>
           <span className="text-2xl lg:text-3xl font-bold text-foreground">Travion</span>
         </div>
 
