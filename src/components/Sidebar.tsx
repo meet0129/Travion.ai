@@ -98,6 +98,9 @@ const Sidebar = () => {
   };
 
   const handleMyTripsClick = () => {
+    if(!isCollapsed){
+      setIsCollapsed(true);
+    }
     setIsMyTripsOpen(!isMyTripsOpen);
   };
 
