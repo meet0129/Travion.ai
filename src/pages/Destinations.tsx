@@ -15,7 +15,8 @@ import {
   MapPin, 
   ThumbsUp, 
   ThumbsDown, 
-  RotateCcw 
+  RotateCcw,
+  Loader2
 } from 'lucide-react';
 import { PlaceItem, fetchAllCategoriesForDestination, nearbyByCategory, similarPlacesByPlace } from '@/database/googlePlaces';
 import { v4 as uuidv4 } from 'uuid';
@@ -38,6 +39,8 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
   const [selectedDestinations, setSelectedDestinations] = useState<PlaceItem[]>([]);
   const [suggestedDestinations, setSuggestedDestinations] = useState<PlaceItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [hoveredPlace, setHoveredPlace] = useState<string | null>(null);
 
@@ -69,18 +72,29 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
         setTripData(data);
         setStartDestination(data.startLocation || "Ahmedabad");
         setEndDestination(data.destination || "Ahmedabad");
+      } else {
+        // No stored data for this chat - start fresh
+        setSelectedDestinations([]);
+        setSuggestedDestinations([]);
       }
     }
   }, [propTripData, chatId]);
 
-  // Restore persisted destinations/suggestions on refresh
+  // Restore persisted destinations/suggestions on refresh (destination-specific)
   useEffect(() => {
     try {
-      const persistedSelected = sessionStorage.getItem(`dest_selected_${chatId}`);
-      const persistedSuggested = sessionStorage.getItem(`dest_suggested_${chatId}`);
-      const persistedUi = sessionStorage.getItem(`dest_ui_${chatId}`);
-      if (persistedSelected) setSelectedDestinations(JSON.parse(persistedSelected));
-      if (persistedSuggested) setSuggestedDestinations(JSON.parse(persistedSuggested));
+      const destinationKey = tripData.destination ? `_${tripData.destination.replace(/\s+/g, '_')}` : '';
+      const persistedSelected = sessionStorage.getItem(`dest_selected_${chatId}${destinationKey}`);
+      const persistedSuggested = sessionStorage.getItem(`dest_suggested_${chatId}${destinationKey}`);
+      const persistedUi = sessionStorage.getItem(`dest_ui_${chatId}${destinationKey}`);
+      
+      // Only restore if we have a valid destination and the data exists
+      if (tripData.destination && persistedSelected) {
+        setSelectedDestinations(JSON.parse(persistedSelected));
+      }
+      if (tripData.destination && persistedSuggested) {
+        setSuggestedDestinations(JSON.parse(persistedSuggested));
+      }
       if (persistedUi) {
         const ui = JSON.parse(persistedUi);
         // Always start with suggestions hidden by default
@@ -88,35 +102,57 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
         if (ui.startDestination) setStartDestination(ui.startDestination);
         if (ui.endDestination) setEndDestination(ui.endDestination);
       }
+      
+      // If no persisted data and we have a destination, start loading
+      if (tripData.destination && !persistedSelected) {
+        setInitialLoading(true);
+      } else if (tripData.destination && persistedSelected) {
+        setInitialLoading(false);
+      }
     } catch {}
-  }, [chatId]);
+  }, [chatId, tripData.destination]);
 
-  // Persist destinations/suggestions/ui state
+  // Persist destinations/suggestions/ui state (destination-specific)
   useEffect(() => {
     try {
-      sessionStorage.setItem(`dest_selected_${chatId}`, JSON.stringify(selectedDestinations));
+      const destinationKey = tripData.destination ? `_${tripData.destination.replace(/\s+/g, '_')}` : '';
+      sessionStorage.setItem(`dest_selected_${chatId}${destinationKey}`, JSON.stringify(selectedDestinations));
     } catch {}
-  }, [selectedDestinations, chatId]);
+  }, [selectedDestinations, chatId, tripData.destination]);
 
   useEffect(() => {
     try {
-      sessionStorage.setItem(`dest_suggested_${chatId}`, JSON.stringify(suggestedDestinations));
+      const destinationKey = tripData.destination ? `_${tripData.destination.replace(/\s+/g, '_')}` : '';
+      sessionStorage.setItem(`dest_suggested_${chatId}${destinationKey}`, JSON.stringify(suggestedDestinations));
     } catch {}
-  }, [suggestedDestinations, chatId]);
+  }, [suggestedDestinations, chatId, tripData.destination]);
 
   useEffect(() => {
     try {
-      sessionStorage.setItem(`dest_ui_${chatId}`, JSON.stringify({ showSuggestions, startDestination, endDestination }));
+      const destinationKey = tripData.destination ? `_${tripData.destination.replace(/\s+/g, '_')}` : '';
+      sessionStorage.setItem(`dest_ui_${chatId}${destinationKey}`, JSON.stringify({ showSuggestions, startDestination, endDestination }));
     } catch {}
-  }, [showSuggestions, startDestination, endDestination, chatId]);
+  }, [showSuggestions, startDestination, endDestination, chatId, tripData.destination]);
 
   // Load initial destinations based on preferences
   const loadInitialDestinations = async () => {
-    if (!apiKey || !tripData.destination) return;
+    if (!apiKey || !tripData.destination) {
+      setInitialLoading(false);
+      return;
+    }
     
+    setInitialLoading(true);
     setLoading(true);
+    // Clear any existing destinations to prevent showing random places
+    setSelectedDestinations([]);
+    setSuggestedDestinations([]);
+    
     try {
-      const selectedPreferences = JSON.parse(localStorage.getItem('selectedPreferences') || '[]');
+      // Get chat-specific preferences only
+      const currentChatId = sessionStorage.getItem('currentChatId');
+      const selectedPreferences = currentChatId 
+        ? JSON.parse(localStorage.getItem(`selectedPreferences_${currentChatId}`) || '[]')
+        : [];
       
       const allPlacesData = await fetchAllCategoriesForDestination(tripData.destination, apiKey);
       
@@ -129,21 +165,28 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
       
       setSelectedDestinations(filteredPlaces);
     } catch (error) {
-      // Error loading destinations
+      // Error loading destinations - keep destinations empty
+      setSelectedDestinations([]);
     } finally {
       setLoading(false);
+      setInitialLoading(false);
     }
   };
 
   // Sync from Preferences (real-time) — add newly picked places while on destinations
   const syncFromPreferences = () => {
     try {
-      const picked: PlaceItem[] = JSON.parse(localStorage.getItem('selectedPreferences') || '[]');
-      if (!Array.isArray(picked)) return;
-      const newOnes = picked.filter(p => !selectedDestinations.some(d => d.id === p.id));
-      if (newOnes.length > 0) {
-        setSelectedDestinations(prev => [...prev, ...newOnes]);
-        setSuggestedDestinations(prev => prev.filter(p => !newOnes.some(n => n.id === p.id)));
+      // Get chat-specific preferences only
+      const currentChatId = sessionStorage.getItem('currentChatId');
+      if (currentChatId) {
+        const storageKey = `selectedPreferences_${currentChatId}`;
+        const picked: PlaceItem[] = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        if (!Array.isArray(picked)) return;
+        const newOnes = picked.filter(p => !selectedDestinations.some(d => d.id === p.id));
+        if (newOnes.length > 0) {
+          setSelectedDestinations(prev => [...prev, ...newOnes]);
+          setSuggestedDestinations(prev => prev.filter(p => !newOnes.some(n => n.id === p.id)));
+        }
       }
     } catch {}
   };
@@ -151,7 +194,7 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
   // Listen for preference changes (within same tab via polling micro-task + storage for cross-tab)
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key === 'selectedPreferences') syncFromPreferences();
+      if (e.key === 'selectedPreferences' || e.key?.startsWith('selectedPreferences_')) syncFromPreferences();
     };
     window.addEventListener('storage', onStorage);
     // Immediate sync on mount and whenever tripData.preferences changes from parent
@@ -175,7 +218,7 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
   const loadSuggestions = async (limit: number = 10) => {
     if (!apiKey || !tripData.destination) return;
     
-    setLoading(true);
+    setLoadingSuggestions(true);
     try {
       let suggestions: PlaceItem[] = [];
       
@@ -208,7 +251,7 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
     } catch (error) {
       // Error loading suggestions
     } finally {
-      setLoading(false);
+      setLoadingSuggestions(false);
     }
   };
 
@@ -218,7 +261,7 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
     const need = Math.max(0, 7 - suggestedDestinations.length);
     if (need === 0) return;
 
-    setLoading(true);
+    setLoadingSuggestions(true);
     try {
       if (selectedDestinations.length > 0) {
         const centerPlace = selectedDestinations[0];
@@ -233,7 +276,7 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
     } catch (error) {
       console.error('Error loading nearby places:', error);
     } finally {
-      setLoading(false);
+      setLoadingSuggestions(false);
     }
   };
 
@@ -268,7 +311,15 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
 
   // Remove destination
   const removeDestination = (id: string) => {
-    setSelectedDestinations(prev => prev.filter(d => d.id !== id));
+    setSelectedDestinations(prev => {
+      const updated = prev.filter(d => d.id !== id);
+      // Also update session storage immediately (destination-specific)
+      try {
+        const destinationKey = tripData.destination ? `_${tripData.destination.replace(/\s+/g, '_')}` : '';
+        sessionStorage.setItem(`dest_selected_${chatId}${destinationKey}`, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
   };
 
   // Handle generate trip
@@ -297,6 +348,42 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
 
   // Calculate pins for map - show suggestions only when visible
   const allPins = showSuggestions ? [...selectedDestinations, ...suggestedDestinations] : selectedDestinations;
+
+  // Loading component for destinations
+  const LoadingSkeleton = () => (
+    <div className="space-y-1 mb-2">
+      {[1, 2, 3].map((i) => (
+        <Card key={i} className="p-2 border border-gray-200 rounded-md bg-white h-16 animate-pulse">
+          <div className="flex items-center gap-2 h-full">
+            <div className="w-12 h-10 bg-gray-200 rounded-md flex-shrink-0"></div>
+            <div className="flex-1 min-w-0">
+              <div className="h-3 bg-gray-200 rounded w-3/4 mb-2"></div>
+              <div className="h-2 bg-gray-200 rounded w-1/2"></div>
+            </div>
+            <div className="w-4 h-4 bg-gray-200 rounded-full flex-shrink-0"></div>
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+
+  // Loading component for suggestions
+  const SuggestionsLoadingSkeleton = () => (
+    <div className="space-y-1 max-h-48 overflow-y-auto">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <div key={i} className="border border-gray-200 rounded-md bg-white shadow-sm p-2 h-12 animate-pulse">
+          <div className="flex items-center gap-2 h-full">
+            <div className="w-8 h-6 bg-gray-200 rounded flex-shrink-0"></div>
+            <div className="flex-1 min-w-0">
+              <div className="h-3 bg-gray-200 rounded w-2/3 mb-1"></div>
+              <div className="h-2 bg-gray-200 rounded w-1/3"></div>
+            </div>
+            <div className="w-3 h-3 bg-gray-200 rounded flex-shrink-0"></div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div className="h-screen bg-white font-['Inter',sans-serif] flex flex-col">
@@ -368,9 +455,12 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
                       Chosen by Travion.ai based on the conversation. You can Add to, Remove from, or Reorder this list.
                     </p>
 
-                    <div className="space-y-1 mb-2">
+                    {initialLoading ? (
+                      <LoadingSkeleton />
+                    ) : (
+                      <div className="space-y-1 mb-2">
                 {selectedDestinations.map((destination, index) => (
-                        <Card key={destination.id} className="p-2 border border-gray-200 rounded-md bg-white hover:shadow-sm transition-shadow h-16">
+                        <Card key={`selected-${destination.id}-${index}`} className="p-2 border border-gray-200 rounded-md bg-white hover:shadow-sm transition-shadow h-16">
                           <div className="flex items-center gap-2 h-full">
                       <div className="relative flex-shrink-0">
                         <img 
@@ -414,6 +504,7 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
                   </Card>
                 ))}
               </div>
+                    )}
 
                     <div className="mb-2">
                 <Button 
@@ -424,10 +515,15 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
                             await loadSuggestions(10); 
                           } 
                         }}
-                        className="w-full flex items-center justify-center gap-1 h-8 rounded-md border-2 border-dashed border-purple-300 hover:border-purple-400 hover:bg-purple-50 transition-colors bg-white text-xs font-medium"
+                        disabled={loadingSuggestions}
+                        className="w-full flex items-center justify-center gap-1 h-8 rounded-md border-2 border-dashed border-purple-300 hover:border-purple-400 hover:bg-purple-50 transition-colors bg-white text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Plus className="w-3 h-3 text-purple-600" />
-                  Add Another Destination
+                  {loadingSuggestions ? (
+                    <Loader2 className="w-3 h-3 text-purple-600 animate-spin" />
+                  ) : (
+                    <Plus className="w-3 h-3 text-purple-600" />
+                  )}
+                  {loadingSuggestions ? 'Loading suggestions...' : 'Add Another Destination'}
                 </Button>
               </div>
               
@@ -439,7 +535,7 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
               )}
 
               {/* Suggestions */}
-              {showSuggestions && suggestedDestinations.length > 0 && (
+              {showSuggestions && (
                       <div className="mb-2">
                   <div className="flex items-center justify-between mb-2">
                           <div className="text-xs font-medium text-gray-700">Suggestions for you</div>
@@ -454,10 +550,13 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
                         Hide
                       </Button>
                     </div>
+                        {loadingSuggestions ? (
+                          <SuggestionsLoadingSkeleton />
+                        ) : suggestedDestinations.length > 0 ? (
                         <div className="space-y-1 max-h-48 overflow-y-auto">
-                    {suggestedDestinations.map((s) => (
+                    {suggestedDestinations.map((s, index) => (
                       <div
-                        key={s.id}
+                        key={`suggested-${s.id}-${index}`}
                         title={s.name}
                               className="border border-gray-200 rounded-md bg-white shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer p-2 h-12"
                         onMouseEnter={() => setHoveredPlace(s.id)}
@@ -495,6 +594,11 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
                       </div>
                     ))}
                   </div>
+                        ) : (
+                          <div className="text-center py-4 text-gray-500 text-xs">
+                            No suggestions available
+                          </div>
+                        )}
                 </div>
               )}
           </div>
@@ -503,7 +607,14 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
                 {/* Right Column - Map */}
                 <div className="col-span-3 pl-4">
                   <div className="h-[400px] w-full border border-blue-300 rounded-lg overflow-hidden ml-4">
-            {mapsApiKey && allPins.length > 0 ? (
+            {initialLoading ? (
+              <div className="h-full flex items-center justify-center bg-gray-50">
+                <div className="text-center">
+                  <Loader2 className="w-8 h-8 text-purple-600 mx-auto mb-2 animate-spin" />
+                  <p className="text-xs text-gray-500">Loading destinations...</p>
+                </div>
+              </div>
+            ) : mapsApiKey && allPins.length > 0 ? (
               <MapEmbed 
                 apiKey={mapsApiKey} 
                 pins={allPins} 
@@ -554,9 +665,17 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
                   {/* Generate Trip Button */}
                   <Button 
                     onClick={handleGenerateTrip}
-                    className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white px-6 py-2 rounded-lg text-sm font-medium"
+                    disabled={initialLoading || selectedDestinations.length === 0}
+                    className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white px-6 py-2 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Generate Trip with {selectedDestinations.length} Destinations
+                    {initialLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Loading...
+                      </>
+                    ) : (
+                      `Generate Trip with ${selectedDestinations.length} Destinations`
+                    )}
             </Button>
           </div>
 

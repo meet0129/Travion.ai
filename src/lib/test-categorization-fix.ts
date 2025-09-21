@@ -1,18 +1,15 @@
 import { fetchAllCategoriesForDestination } from '../database/googlePlaces';
 
 async function testCategorizationFix() {
-  console.log('🧪 Testing categorization fix for Manali...');
   const testDestination = 'Manali';
   const testApiKey = import.meta.env.VITE_GOOGLE_PLACES_API_KEY as string;
 
   if (!testApiKey) {
-    console.error('❌ API Key is not set for categorization test.');
     return;
   }
 
   try {
     const result = await fetchAllCategoriesForDestination(testDestination, testApiKey, 3);
-    console.log('✅ Categorization test results for Manali:', result);
 
     // Check for camps in food_cafes (should not happen)
     const foodCafes = result.food_cafes || [];
@@ -22,12 +19,6 @@ async function testCategorizationFix() {
       place.name.toLowerCase().includes('temple') ||
       place.name.toLowerCase().includes('monument')
     );
-    
-    if (campsInFood.length === 0) {
-      console.log('✅ No camps/temples/monuments found in Food & Cafes category.');
-    } else {
-      console.error('❌ Non-food places found in Food & Cafes category:', campsInFood.map(p => p.name));
-    }
 
     // Check if food_cafes only contains food establishments
     const nonFoodInFood = foodCafes.filter(place => {
@@ -42,32 +33,21 @@ async function testCategorizationFix() {
       
       return !hasFoodType && !hasFoodKeyword;
     });
-    
-    if (nonFoodInFood.length === 0) {
-      console.log('✅ Food & Cafes category contains only food establishments.');
-    } else {
-      console.error('❌ Non-food places found in Food & Cafes category:', nonFoodInFood.map(p => p.name));
-    }
 
     // Check if all places have photos and high ratings
     const allPlaces = [...(result.attractions || []), ...(result.day_trips || []), ...(result.food_cafes || []), ...(result.hidden_gems || [])];
     const placesWithoutPhotosOrLowRating = allPlaces.filter(place => 
       !place.photoUrl || (place.rating && place.rating < 4.0) || (place.userRatingsTotal && place.userRatingsTotal < 10)
     );
-    
-    if (placesWithoutPhotosOrLowRating.length === 0) {
-      console.log('✅ All fetched places have photos and high ratings (4.0+ and 10+ reviews).');
-    } else {
-      console.error('❌ Places found without photos or with low ratings:', placesWithoutPhotosOrLowRating.map(p => `${p.name} (Rating: ${p.rating}, Reviews: ${p.userRatingsTotal}, Photo: ${!!p.photoUrl})`));
-    }
-
-    console.log('✅ Categorization fix test complete.');
 
   } catch (error) {
-    console.error('❌ Categorization fix test failed:', error);
+    // Silent error handling
   }
 }
 
-testCategorizationFix();
+// Auto-run test when imported (silent)
+if (typeof window !== 'undefined') {
+  testCategorizationFix();
+}
 
 

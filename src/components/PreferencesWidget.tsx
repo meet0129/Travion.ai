@@ -42,27 +42,54 @@ const PreferencesWidget = ({ destination, onComplete, onPreferencesChange }: Pro
 
   const apiKey = import.meta.env.VITE_GOOGLE_PLACES_API_KEY as string | undefined;
 
-  // Initialize with previously selected preferences
+  // Initialize with previously selected preferences (chat-specific only)
   useEffect(() => {
     try {
-      const savedPreferences = localStorage.getItem('selectedPreferences');
-      if (savedPreferences) {
-        const preferences = JSON.parse(savedPreferences);
-        const pickedIds = preferences.map(p => p.id);
-        const pickedPlacesMap = {};
-        preferences.forEach(p => {
-          pickedPlacesMap[p.id] = p;
-        });
-        setPicked(pickedIds);
-        setPickedPlaces(pickedPlacesMap);
+      // Get current chat ID - only load if we have a specific chat
+      const currentChatId = sessionStorage.getItem('currentChatId');
+      
+      if (currentChatId) {
+        const storageKey = `selectedPreferences_${currentChatId}`;
+        const savedPreferences = localStorage.getItem(storageKey);
         
-        // Notify parent about loaded preferences
+        if (savedPreferences) {
+          const preferences = JSON.parse(savedPreferences);
+          const pickedIds = preferences.map(p => p.id);
+          const pickedPlacesMap = {};
+          preferences.forEach(p => {
+            pickedPlacesMap[p.id] = p;
+          });
+          setPicked(pickedIds);
+          setPickedPlaces(pickedPlacesMap);
+          
+          // Notify parent about loaded preferences
+          if (onPreferencesChange) {
+            onPreferencesChange(preferences);
+          }
+        } else {
+          // No saved preferences for this chat - start fresh
+          setPicked([]);
+          setPickedPlaces({});
+          if (onPreferencesChange) {
+            onPreferencesChange([]);
+          }
+        }
+      } else {
+        // No chat ID - start completely fresh
+        setPicked([]);
+        setPickedPlaces({});
         if (onPreferencesChange) {
-          onPreferencesChange(preferences);
+          onPreferencesChange([]);
         }
       }
     } catch (error) {
       console.error('Error loading saved preferences:', error);
+      // On error, start fresh
+      setPicked([]);
+      setPickedPlaces({});
+      if (onPreferencesChange) {
+        onPreferencesChange([]);
+      }
     }
   }, [onPreferencesChange]);
 
@@ -209,7 +236,7 @@ const PreferencesWidget = ({ destination, onComplete, onPreferencesChange }: Pro
       });
     }
     
-    // Update localStorage immediately for real-time sync
+    // Update localStorage immediately for real-time sync (chat-specific)
     const updatedPlaces = isCurrentlyPicked 
       ? Object.values(pickedPlaces).filter(p => p.id !== id)
       : place 
@@ -217,7 +244,11 @@ const PreferencesWidget = ({ destination, onComplete, onPreferencesChange }: Pro
         : Object.values(pickedPlaces).filter(p => p.id !== id);
     
     try {
-      localStorage.setItem('selectedPreferences', JSON.stringify(updatedPlaces));
+      const currentChatId = sessionStorage.getItem('currentChatId');
+      if (currentChatId) {
+        const storageKey = `selectedPreferences_${currentChatId}`;
+        localStorage.setItem(storageKey, JSON.stringify(updatedPlaces));
+      }
     } catch (error) {
       console.error('Error saving preferences:', error);
     }
@@ -449,11 +480,12 @@ const PreferencesWidget = ({ destination, onComplete, onPreferencesChange }: Pro
             <button
               onClick={() => {
                 const selected = picked.map(id => pickedPlaces[id]).filter(Boolean);
-                  // Persist globally and per-chat for real-time sync with Destinations and chat sessions
+                // Persist per-chat for real-time sync with Destinations and chat sessions
                 try {
-                  localStorage.setItem('selectedPreferences', JSON.stringify(selected));
                   const currentChatId = sessionStorage.getItem('currentChatId');
                   if (currentChatId) {
+                    const storageKey = `selectedPreferences_${currentChatId}`;
+                    localStorage.setItem(storageKey, JSON.stringify(selected));
                     sessionStorage.setItem(`selectedPreferences_${currentChatId}`, JSON.stringify(selected));
                   }
                 } catch {}

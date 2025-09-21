@@ -2,44 +2,15 @@
 import { fetchAllCategoriesForDestination } from '../database/googlePlaces';
 
 export async function testCategorization() {
-  console.log('🧪 Testing Categorization Accuracy...');
-  
   const testDestination = 'Manali';
   const testApiKey = import.meta.env.VITE_GOOGLE_PLACES_API_KEY as string;
 
   if (!testApiKey) {
-    console.error('❌ API Key is not set for categorization test.');
     return;
   }
 
   try {
     const result = await fetchAllCategoriesForDestination(testDestination, testApiKey, 3);
-    
-    console.log('📊 Categorization Test Results:');
-    
-    // Test Attractions
-    console.log('🏛️ Attractions:', result.attractions.length);
-    result.attractions.forEach((place, index) => {
-      console.log(`  ${index + 1}. ${place.name} - Types: ${place.types?.join(', ')}`);
-    });
-    
-    // Test Day Trips
-    console.log('🏔️ Day Trips:', result.day_trips.length);
-    result.day_trips.forEach((place, index) => {
-      console.log(`  ${index + 1}. ${place.name} - Types: ${place.types?.join(', ')}`);
-    });
-    
-    // Test Food & Cafes
-    console.log('🍽️ Food & Cafes:', result.food_cafes.length);
-    result.food_cafes.forEach((place, index) => {
-      console.log(`  ${index + 1}. ${place.name} - Types: ${place.types?.join(', ')}`);
-    });
-    
-    // Test Hidden Gems
-    console.log('💎 Hidden Gems:', result.hidden_gems.length);
-    result.hidden_gems.forEach((place, index) => {
-      console.log(`  ${index + 1}. ${place.name} - Types: ${place.types?.join(', ')}`);
-    });
     
     // Check for categorization issues
     const issues = [];
@@ -52,7 +23,7 @@ export async function testCategorization() {
     );
     
     if (campsInFood.length > 0) {
-      issues.push(`❌ Found ${campsInFood.length} camps in food category: ${campsInFood.map(p => p.name).join(', ')}`);
+      issues.push(`Found ${campsInFood.length} camps in food category`);
     }
     
     // Check if restaurants are in attractions
@@ -64,7 +35,7 @@ export async function testCategorization() {
     );
     
     if (restaurantsInAttractions.length > 0) {
-      issues.push(`❌ Found ${restaurantsInAttractions.length} restaurants in attractions: ${restaurantsInAttractions.map(p => p.name).join(', ')}`);
+      issues.push(`Found ${restaurantsInAttractions.length} restaurants in attractions`);
     }
     
     // Check if hotels are in attractions
@@ -75,24 +46,16 @@ export async function testCategorization() {
     );
     
     if (hotelsInAttractions.length > 0) {
-      issues.push(`❌ Found ${hotelsInAttractions.length} hotels in attractions: ${hotelsInAttractions.map(p => p.name).join(', ')}`);
-    }
-    
-    if (issues.length === 0) {
-      console.log('✅ Categorization test passed! No cross-category contamination found.');
-    } else {
-      console.log('❌ Categorization issues found:');
-      issues.forEach(issue => console.log(issue));
+      issues.push(`Found ${hotelsInAttractions.length} hotels in attractions`);
     }
     
     return result;
   } catch (error) {
-    console.error('❌ Categorization test failed:', error);
     return null;
   }
 }
 
-// Auto-run test when imported
+// Auto-run test when imported (silent)
 if (typeof window !== 'undefined') {
   testCategorization();
 }

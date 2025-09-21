@@ -216,15 +216,22 @@ const Chat = () => {
             // No Firebase data, check sessionStorage
             const storedMessages = JSON.parse(sessionStorage.getItem(`messages_${chatId}`) || '[]');
             const storedContext = JSON.parse(sessionStorage.getItem(`tripContext_${chatId}`) || '{}');
-            const storedPreferences = JSON.parse(localStorage.getItem('selectedPreferences') || '[]');
+            const storedPreferences = JSON.parse(localStorage.getItem(`selectedPreferences_${chatId}`) || '[]');
+            const storedUIState = JSON.parse(sessionStorage.getItem(`ui_state_${chatId}`) || '{}');
             
             if (storedMessages.length > 0 || Object.keys(storedContext).length > 0) {
               setMessages(storedMessages);
               setTripContext(storedContext);
               setSelectedPreferences(storedPreferences);
               setHasUserInteracted(true);
+              
+              // Restore UI state
+              setPreferencesShown(storedUIState.preferencesShown || false);
+              setShowDestinations(storedUIState.showDestinations || false);
+              setShowSummaryConfirmation(storedUIState.showSummaryConfirmation || false);
+              setIsVibeExpanded(storedUIState.isVibeExpanded || false);
             } else {
-              // Fresh start
+              // Fresh start - clear any existing preferences for this chat
               setMessages([]);
               setTripContext({
                 destination: '',
@@ -240,6 +247,10 @@ const Chat = () => {
               setShowDestinations(false);
               setShowSummaryConfirmation(false);
               setHasUserInteracted(false);
+              
+              // Clear any existing preferences for this chat
+              localStorage.removeItem(`selectedPreferences_${chatId}`);
+              sessionStorage.removeItem(`selectedPreferences_${chatId}`);
             }
           }
         } catch (error) {
@@ -260,6 +271,10 @@ const Chat = () => {
           setShowDestinations(false);
           setShowSummaryConfirmation(false);
           setHasUserInteracted(false);
+          
+          // Clear any existing preferences for this chat
+          localStorage.removeItem(`selectedPreferences_${chatId}`);
+          sessionStorage.removeItem(`selectedPreferences_${chatId}`);
         }
         
         // Update current chat ID
@@ -284,6 +299,19 @@ const Chat = () => {
   const [showSummaryConfirmation, setShowSummaryConfirmation] = useState(false);
   const [selectedPreferences, setSelectedPreferences] = useState([]);
   const messagesEndRef = useRef(null);
+
+  // Persist UI state
+  useEffect(() => {
+    if (currentChatId) {
+      const uiState = {
+        preferencesShown,
+        showDestinations,
+        showSummaryConfirmation,
+        isVibeExpanded
+      };
+      sessionStorage.setItem(`ui_state_${currentChatId}`, JSON.stringify(uiState));
+    }
+  }, [preferencesShown, showDestinations, showSummaryConfirmation, isVibeExpanded, currentChatId]);
 
   // Utilities: normalize natural date strings and compute duration
   const normalizeDateString = (value) => {
@@ -880,7 +908,11 @@ Please help me complete the missing information.`;
     const tripData = JSON.parse(sessionStorage.getItem(`tripData_${currentChatId}`) || '{}');
     tripData.preferences = preferences;
     sessionStorage.setItem(`tripData_${currentChatId}`, JSON.stringify(tripData));
-    localStorage.setItem('selectedPreferences', JSON.stringify(preferences));
+    
+    // Save to chat-specific localStorage
+    if (currentChatId) {
+      localStorage.setItem(`selectedPreferences_${currentChatId}`, JSON.stringify(preferences));
+    }
   };
 
   const handleDestinationsComplete = async (destinations: any[]) => {

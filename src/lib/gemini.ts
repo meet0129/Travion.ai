@@ -119,6 +119,12 @@ class GeminiService {
         conversationHistory = [...previousConversation, ...conversationHistory];
       }
 
+      // Check if this is a greeting or casual message
+      const lowerMessage = userMessage.toLowerCase();
+      const isGreeting = lowerMessage.includes('hello') || lowerMessage.includes('hi') || 
+                        lowerMessage.includes('hey') || lowerMessage.includes('good morning') ||
+                        lowerMessage.includes('good afternoon') || lowerMessage.includes('good evening');
+      
       // Guidance: ask only missing info
       const needDestination = !tripContext?.destination;
       const needStart = !tripContext?.startLocation;
@@ -126,7 +132,7 @@ class GeminiService {
       const needTravelers = !(tripContext?.travelers > 0);
       const haveAll = !needDestination && !needStart && !needDates && !needTravelers;
 
-      const contextualPrompt = `CURRENT CONVERSATION STATE:
+      let contextualPrompt = `CURRENT CONVERSATION STATE:
 Destination: ${tripContext?.destination || 'NOT PROVIDED'}
 Start Location: ${tripContext?.startLocation || 'NOT PROVIDED'}
 Travel Dates: ${tripContext?.startDate || tripContext?.endDate || tripContext?.duration || 'NOT PROVIDED'}
@@ -134,17 +140,31 @@ Travelers: ${tripContext?.travelers || 'NOT PROVIDED'}
 
 LATEST USER MESSAGE: "${userMessage}"
 
-INSTRUCTIONS:
-${haveAll 
-  ? 'ALL ESSENTIALS COLLECTED → Respond with completion trigger: "Perfect! I have all your essential trip details. Let me show you a summary for confirmation! 📋"'
-  : 'MISSING ESSENTIALS → Acknowledge what you have, ask for what\'s missing. Reference previous conversation context.'
-}
+INSTRUCTIONS:`;
+
+      if (isGreeting) {
+        contextualPrompt += `
+GREETING DETECTED → Respond warmly and naturally, then guide toward trip planning.
+- Be friendly and enthusiastic
+- Acknowledge the greeting
+- Gently steer toward trip planning if no trip details are provided
+- If trip details exist, reference them and ask what they'd like to do next`;
+      } else if (haveAll) {
+        contextualPrompt += `
+ALL ESSENTIALS COLLECTED → Respond with completion trigger: "Perfect! I have all your essential trip details. Let me show you a summary for confirmation! 📋"`;
+      } else {
+        contextualPrompt += `
+MISSING ESSENTIALS → Acknowledge what you have, ask for what's missing. Reference previous conversation context.`;
+      }
+
+      contextualPrompt += `
 
 RESPONSE REQUIREMENTS:
 - Maximum 2 sentences
 - Show awareness of conversation history
 - Use appropriate emoji
-- Be specific about what you need`;
+- Be specific about what you need
+- Always respond to user messages, even casual ones`;
 
       // Build conversation context for the AI (use structured contents API)
       const contents = this.conversationHistory.map((m) => ({
@@ -188,12 +208,28 @@ RESPONSE REQUIREMENTS:
   private getFallbackResponse(userMessage: string, tripContext?: any): string {
     const lowerMessage = userMessage.toLowerCase();
     
+    // Check if this is a greeting
+    const isGreeting = lowerMessage.includes('hello') || lowerMessage.includes('hi') || 
+                      lowerMessage.includes('hey') || lowerMessage.includes('good morning') ||
+                      lowerMessage.includes('good afternoon') || lowerMessage.includes('good evening');
+    
     // Check if we have all required information
     const hasDestination = tripContext?.destination;
     const hasStartLocation = tripContext?.startLocation;
     const hasDates = tripContext?.startDate || tripContext?.endDate;
     const hasTravelers = tripContext?.travelers > 0;
     const hasDuration = tripContext?.duration;
+
+    // Handle greetings
+    if (isGreeting) {
+      if (hasDestination && hasStartLocation && (hasDates || hasDuration) && hasTravelers) {
+        return `Hello! 👋 Great to see you again! I have all your trip details for ${tripContext.destination}. What would you like to do next?`;
+      } else if (hasDestination) {
+        return `Hi there! 😊 I see you're planning a trip to ${tripContext.destination}. Let me help you complete the details!`;
+      } else {
+        return "Hello! 🌟 Welcome to Travion.ai! I'm here to help you plan the perfect Indian getaway. Which destination are you dreaming of visiting?";
+      }
+    }
 
     // If we have all essential info, trigger confirmation
     if (hasDestination && hasStartLocation && (hasDates || hasDuration) && hasTravelers) {

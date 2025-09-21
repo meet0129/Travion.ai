@@ -11,8 +11,27 @@ const PreferencesFolded: React.FC<PreferencesFoldedProps> = ({ preferences, onEx
   const [isExpanded, setIsExpanded] = useState(false);
   const [localPrefs, setLocalPrefs] = useState<any[]>(preferences || []);
 
+  // Restore expanded state from session storage
+  useEffect(() => {
+    const currentChatId = sessionStorage.getItem('currentChatId');
+    if (currentChatId) {
+      const storedState = sessionStorage.getItem(`preferences_expanded_${currentChatId}`);
+      if (storedState) {
+        setIsExpanded(JSON.parse(storedState));
+      }
+    }
+  }, []);
+
   const handleExpand = () => {
-    setIsExpanded(!isExpanded);
+    const newExpandedState = !isExpanded;
+    setIsExpanded(newExpandedState);
+    
+    // Persist expanded state
+    const currentChatId = sessionStorage.getItem('currentChatId');
+    if (currentChatId) {
+      sessionStorage.setItem(`preferences_expanded_${currentChatId}`, JSON.stringify(newExpandedState));
+    }
+    
     onExpand();
   };
 
