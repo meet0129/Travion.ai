@@ -32,51 +32,45 @@ const PreferencesFolded: React.FC<PreferencesFoldedProps> = ({ preferences, onEx
   }, [preferences]);
 
   return (
-    <div className="bg-gray-100 rounded-lg p-3 mb-4 border border-gray-200">
+    <div className="bg-gray-50 rounded-lg p-4 mb-4 border border-gray-200 shadow-sm">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-gray-700 font-medium text-sm">Select your vibe</span>
-          {localPrefs.length > 0 && (
-            <span className="text-gray-500 text-xs">({localPrefs.length} selected)</span>
+          {localPrefs.length > 0 ? (
+            <span className="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-full">
+              {localPrefs.length} selected
+            </span>
+          ) : (
+            <span className="text-gray-500 text-xs">No preferences selected</span>
           )}
         </div>
         <Button
           variant="ghost"
           size="sm"
           onClick={handleExpand}
-          className="text-gray-500 hover:text-gray-700 hover:bg-gray-200 p-1 h-6"
+          className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 px-3 py-1 h-auto text-sm font-medium"
         >
-          {isExpanded ? (
-            <>
-              <span className="text-xs mr-1">Collapse</span>
-              <ChevronUp className="w-3 h-3" />
-            </>
-          ) : (
-            <>
-              <span className="text-xs mr-1">Expand</span>
-              <ChevronDown className="w-3 h-3" />
-            </>
-          )}
+          Expand
+          <ChevronDown className="w-4 h-4 ml-1" />
         </Button>
       </div>
       
-      {isExpanded && (
-        <div className="mt-3 space-y-2">
-          <div className="text-xs text-gray-600 mb-2">Selected preferences:</div>
-          <div className="flex flex-wrap gap-1">
-            {localPrefs.length > 0 ? (
-              localPrefs.map((pref, index) => (
-                <span
-                  key={index}
-                  className="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-full border border-purple-200"
-                >
-                  {pref.name || pref.category || pref}
-                </span>
-              ))
-            ) : (
-              <span className="text-xs text-gray-500">No preferences selected yet</span>
-            )}
-          </div>
+      {/* Show selected preferences as tags when folded */}
+      {!isExpanded && localPrefs.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {localPrefs.slice(0, 3).map((pref, index) => (
+            <span
+              key={index}
+              className="bg-white text-gray-600 text-xs px-3 py-1 rounded-full border border-gray-300"
+            >
+              {pref.name || pref.category || pref}
+            </span>
+          ))}
+          {localPrefs.length > 3 && (
+            <span className="text-gray-500 text-xs px-2 py-1">
+              +{localPrefs.length - 3} more
+            </span>
+          )}
         </div>
       )}
     </div>

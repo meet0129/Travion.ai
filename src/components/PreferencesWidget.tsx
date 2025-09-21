@@ -42,6 +42,30 @@ const PreferencesWidget = ({ destination, onComplete, onPreferencesChange }: Pro
 
   const apiKey = import.meta.env.VITE_GOOGLE_PLACES_API_KEY as string | undefined;
 
+  // Initialize with previously selected preferences
+  useEffect(() => {
+    try {
+      const savedPreferences = localStorage.getItem('selectedPreferences');
+      if (savedPreferences) {
+        const preferences = JSON.parse(savedPreferences);
+        const pickedIds = preferences.map(p => p.id);
+        const pickedPlacesMap = {};
+        preferences.forEach(p => {
+          pickedPlacesMap[p.id] = p;
+        });
+        setPicked(pickedIds);
+        setPickedPlaces(pickedPlacesMap);
+        
+        // Notify parent about loaded preferences
+        if (onPreferencesChange) {
+          onPreferencesChange(preferences);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading saved preferences:', error);
+    }
+  }, [onPreferencesChange]);
+
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
@@ -51,11 +75,45 @@ const PreferencesWidget = ({ destination, onComplete, onPreferencesChange }: Pro
       if (!destination || !apiKey) {
         return;
       }
+
+      // Check cache first
+      const cacheKey = `preferences_${destination}`;
+      const cachedData = localStorage.getItem(cacheKey);
+      
+      if (cachedData) {
+        try {
+          const parsedData = JSON.parse(cachedData);
+          // Check if cache is less than 24 hours old
+          const cacheTime = parsedData.timestamp;
+          const now = Date.now();
+          const twentyFourHours = 24 * 60 * 60 * 1000;
+          
+          if (now - cacheTime < twentyFourHours) {
+            setData(parsedData.data);
+            return;
+          }
+        } catch (error) {
+          console.error('Error parsing cached data:', error);
+        }
+      }
+
       setLoading(true);
       setError(null);
       try {
         const result = await fetchAllCategoriesForDestination(destination, apiKey, 6);
-        if (!cancelled) setData(result as any);
+        if (!cancelled) {
+          setData(result as any);
+          
+          // Cache the result
+          try {
+            localStorage.setItem(cacheKey, JSON.stringify({
+              data: result,
+              timestamp: Date.now()
+            }));
+          } catch (error) {
+            console.error('Error caching preferences data:', error);
+          }
+        }
       } catch (e) {
         console.error('❌ API call failed:', e);
         if (!cancelled) setError('Failed to load places for this destination.');
@@ -71,6 +129,33 @@ const PreferencesWidget = ({ destination, onComplete, onPreferencesChange }: Pro
   const loadMorePlaces = async (category: TabKey) => {
     if (!destination || !apiKey || showMore[category]) return;
     
+    // Check cache for "more places" data
+    const moreCacheKey = `preferences_more_${destination}_${category}`;
+    const cachedMoreData = localStorage.getItem(moreCacheKey);
+    
+    if (cachedMoreData) {
+      try {
+        const parsedData = JSON.parse(cachedMoreData);
+        const cacheTime = parsedData.timestamp;
+        const now = Date.now();
+        const twentyFourHours = 24 * 60 * 60 * 1000;
+        
+        if (now - cacheTime < twentyFourHours) {
+          setData(prev => ({
+            ...prev,
+            [category]: parsedData.data
+          }));
+          setShowMore(prev => ({
+            ...prev,
+            [category]: true
+          }));
+          return;
+        }
+      } catch (error) {
+        console.error('Error parsing cached more data:', error);
+      }
+    }
+    
     setLoading(true);
     try {
       const loc = await geocodeDestination(destination, apiKey);
@@ -84,6 +169,16 @@ const PreferencesWidget = ({ destination, onComplete, onPreferencesChange }: Pro
           ...prev,
           [category]: true
         }));
+        
+        // Cache the more places data
+        try {
+          localStorage.setItem(moreCacheKey, JSON.stringify({
+            data: morePlaces,
+            timestamp: Date.now()
+          }));
+        } catch (error) {
+          console.error('Error caching more places data:', error);
+        }
       }
     } catch (e) {
       setError('Failed to load more places.');
@@ -98,16 +193,38 @@ const PreferencesWidget = ({ destination, onComplete, onPreferencesChange }: Pro
   const toggle = (id: string) => {
     const list = data[active] || [];
     const place = list.find(p => p.id === id);
-    const newPicked = picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id];
+    const isCurrentlyPicked = picked.includes(id);
+    const newPicked = isCurrentlyPicked ? picked.filter((x) => x !== id) : [...picked, id];
+    
     setPicked(newPicked);
-    if (place) {
+    
+    // Update pickedPlaces
+    if (place && !isCurrentlyPicked) {
       setPickedPlaces(prev => ({ ...prev, [place.id]: place }));
+    } else if (isCurrentlyPicked) {
+      setPickedPlaces(prev => {
+        const updated = { ...prev };
+        delete updated[id];
+        return updated;
+      });
+    }
+    
+    // Update localStorage immediately for real-time sync
+    const updatedPlaces = isCurrentlyPicked 
+      ? Object.values(pickedPlaces).filter(p => p.id !== id)
+      : place 
+        ? [...Object.values(pickedPlaces).filter(p => p.id !== id), place]
+        : Object.values(pickedPlaces).filter(p => p.id !== id);
+    
+    try {
+      localStorage.setItem('selectedPreferences', JSON.stringify(updatedPlaces));
+    } catch (error) {
+      console.error('Error saving preferences:', error);
     }
     
     // Call onPreferencesChange to sync with parent component
     if (onPreferencesChange) {
-      const selectedPlaces = Object.values(pickedPlaces).filter(p => newPicked.includes(p.id));
-      onPreferencesChange(selectedPlaces);
+      onPreferencesChange(updatedPlaces);
     }
     
     // Load more places if user has selected preferences and we haven't loaded more yet
@@ -120,14 +237,11 @@ const PreferencesWidget = ({ destination, onComplete, onPreferencesChange }: Pro
     <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-lg rounded-2xl shadow-xl border border-slate-200/50 dark:border-slate-700/50 overflow-hidden">
       {/* Header */}
       <div className="p-6 border-b border-slate-200 dark:border-slate-700">
-        <div className="flex items-center justify-between mb-4">
+        <div className="mb-4">
           <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             Pick What You Love 
             <Heart className="w-5 h-5 text-pink-500 fill-pink-500" />
           </h3>
-          <button className="text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
-            Skip this step &gt;&gt;
-          </button>
         </div>
         
         <p className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-2">

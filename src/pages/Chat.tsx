@@ -9,8 +9,12 @@ import {
   ThumbsDown,
   RotateCcw,
   Send,
+  Edit2,
+  Check,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import userAvatar from "../assets/default-avatar.svg";
 import Sidebar from "../components/Sidebar";
 import {
@@ -23,6 +27,147 @@ import PreferencesFolded from "../components/PreferencesFolded";
 import Destinations from "../pages/Destinations";
 import { useTrips } from "../contexts/TripsContext";
 import { firebaseChatService } from "../lib/firebaseService";
+
+// Trip Confirmation Dialog Component with Inline Editing
+const TripConfirmationDialog = ({ tripContext, onConfirm, onUpdate }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedContext, setEditedContext] = useState(tripContext);
+
+  const handleEdit = () => {
+    setIsEditing(true);
+    setEditedContext({ ...tripContext });
+  };
+
+  const handleSave = () => {
+    onUpdate(editedContext);
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditedContext({ ...tripContext });
+    setIsEditing(false);
+  };
+
+  const handleFieldChange = (field, value) => {
+    setEditedContext(prev => ({
+      ...prev,
+      [field]: field === 'travelers' ? parseInt(value) || 0 : value
+    }));
+  };
+
+  return (
+    <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-6 mb-4 shadow-sm">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-purple-900">📋 Trip Summary</h3>
+        {!isEditing && (
+          <Button
+            onClick={handleEdit}
+            variant="ghost"
+            size="sm"
+            className="text-purple-600 hover:text-purple-800"
+          >
+            <Edit2 className="w-4 h-4 mr-1" />
+            Edit
+          </Button>
+        )}
+      </div>
+
+      <div className="space-y-4 mb-6">
+        {/* Destination */}
+        <div className="flex items-center gap-3">
+          <span className="font-medium text-purple-800 min-w-[120px]">📍 Destination:</span>
+          {isEditing ? (
+            <Input
+              value={editedContext.destination || ''}
+              onChange={(e) => handleFieldChange('destination', e.target.value)}
+              placeholder="Enter destination"
+              className="flex-1 border-purple-200 focus:border-purple-400"
+            />
+          ) : (
+            <span className="text-purple-700 flex-1">{tripContext.destination || 'Not specified'}</span>
+          )}
+        </div>
+
+        {/* Start Location */}
+        <div className="flex items-center gap-3">
+          <span className="font-medium text-purple-800 min-w-[120px]">🚀 From:</span>
+          {isEditing ? (
+            <Input
+              value={editedContext.startLocation || ''}
+              onChange={(e) => handleFieldChange('startLocation', e.target.value)}
+              placeholder="Enter start location"
+              className="flex-1 border-purple-200 focus:border-purple-400"
+            />
+          ) : (
+            <span className="text-purple-700 flex-1">{tripContext.startLocation || 'Not specified'}</span>
+          )}
+        </div>
+
+        {/* Travelers */}
+        <div className="flex items-center gap-3">
+          <span className="font-medium text-purple-800 min-w-[120px]">👥 Travelers:</span>
+          {isEditing ? (
+            <Input
+              type="number"
+              min="1"
+              value={editedContext.travelers || ''}
+              onChange={(e) => handleFieldChange('travelers', e.target.value)}
+              placeholder="Number of travelers"
+              className="flex-1 border-purple-200 focus:border-purple-400"
+            />
+          ) : (
+            <span className="text-purple-700 flex-1">{tripContext.travelers || 'Not specified'}</span>
+          )}
+        </div>
+
+        {/* Duration/Dates */}
+        <div className="flex items-center gap-3">
+          <span className="font-medium text-purple-800 min-w-[120px]">📅 Duration:</span>
+          {isEditing ? (
+            <Input
+              value={editedContext.duration || editedContext.startDate || ''}
+              onChange={(e) => handleFieldChange('duration', e.target.value)}
+              placeholder="Duration (e.g., 5 days) or start date"
+              className="flex-1 border-purple-200 focus:border-purple-400"
+            />
+          ) : (
+            <span className="text-purple-700 flex-1">{tripContext.duration || tripContext.startDate || 'Not specified'}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex gap-3">
+        {isEditing ? (
+          <>
+            <Button
+              onClick={handleSave}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              <Check className="w-4 h-4 mr-1" />
+              Save Changes
+            </Button>
+            <Button
+              onClick={handleCancel}
+              variant="outline"
+              className="border-gray-300 text-gray-700 hover:bg-gray-50"
+            >
+              <X className="w-4 h-4 mr-1" />
+              Cancel
+            </Button>
+          </>
+        ) : (
+          <Button
+            onClick={onConfirm}
+            className="bg-purple-600 hover:bg-purple-700 text-white"
+          >
+            ✅ Continue to Preferences
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const Chat = () => {
   const navigate = useNavigate();
@@ -393,7 +538,7 @@ const Chat = () => {
       if (
         aiResponse
           .toLowerCase()
-          .includes("let's move on to your travel preferences") ||
+          .includes("let me show you a summary for confirmation") ||
         hasAllInfo
       ) {
         updatedContext.isComplete = true;
@@ -442,10 +587,8 @@ const Chat = () => {
           sessionStorage.setItem(`tripPlan_${currentChatId}`, JSON.stringify(tripPlan));
         } catch {}
 
-        // Set flag to show preferences after the AI response is displayed
-        setTimeout(() => {
-          setPreferencesShown(true);
-        }, 2000); // Wait 2 seconds after the AI response appears
+        // Preferences will only be shown when user clicks Continue in confirmation dialog
+        // Removed automatic preferences showing for better UX control
       }
 
       return aiResponse;
@@ -625,11 +768,46 @@ Ready to map out your adventure? Let's pick your destinations! 🗺️✨`,
     } catch {}
 
     setShowDestinations(true);
+    setPreferencesShown(false); // Hide preferences to show PreferencesFolded
   };
 
   const handleSummaryConfirm = async () => {
     setShowSummaryConfirmation(false);
-    setPreferencesShown(true);
+    
+    // Add user confirmation message
+    const userMessage = {
+      type: "user",
+      content: "✅ Perfect! These details look good. Let's continue!",
+      timestamp: new Date(),
+    };
+    
+    // Add AI summary message
+    const summaryMessage = {
+      type: "ai",
+      content: `Your Trip Summary
+
+Destination: ${tripContext.destination}
+Departure City: ${tripContext.startLocation}  
+Duration: ${tripContext.duration || tripContext.startDate}
+Number of Travelers: ${tripContext.travelers}
+
+Thank you for providing your travel details. Now let's personalize your experience by selecting your travel preferences. This will help me suggest the most suitable places and activities for your ${tripContext.destination} journey.`,
+      timestamp: new Date(),
+    };
+
+    const updatedMessages = [...messages, userMessage, summaryMessage];
+    setMessages(updatedMessages);
+    
+    // Persist updated messages
+    try {
+      const messagesKey = `messages_${currentChatId}`;
+      sessionStorage.setItem(messagesKey, JSON.stringify(updatedMessages));
+    } catch {}
+
+    // Show preferences after a brief delay
+    setTimeout(() => {
+      setPreferencesShown(true);
+    }, 1000);
     
     // Generate chat title using Gemini
     try {
@@ -644,10 +822,54 @@ Ready to map out your adventure? Let's pick your destinations! 🗺️✨`,
     // User can continue the conversation to edit details
   };
 
+  // Handle trip context updates and re-validate with Gemini
+  const handleTripContextUpdate = async (updatedContext) => {
+    try {
+      // Persist updated context
+      const chatKey = `tripContext_${currentChatId}`;
+      sessionStorage.setItem(chatKey, JSON.stringify(updatedContext));
+
+      // Check if all essential information is still complete
+      const hasAllInfo = updatedContext.destination && 
+                        updatedContext.startLocation && 
+                        (updatedContext.startDate || updatedContext.duration) && 
+                        updatedContext.travelers > 0;
+
+      if (!hasAllInfo) {
+        // If information is incomplete, ask Gemini to continue conversation
+        const missingInfo = [];
+        if (!updatedContext.destination) missingInfo.push('destination');
+        if (!updatedContext.startLocation) missingInfo.push('start location');
+        if (!updatedContext.startDate && !updatedContext.duration) missingInfo.push('travel dates');
+        if (!updatedContext.travelers || updatedContext.travelers <= 0) missingInfo.push('number of travelers');
+
+        const contextMessage = `I've updated my trip details. Here's what I have now: 
+${updatedContext.destination ? `Destination: ${updatedContext.destination}` : ''}
+${updatedContext.startLocation ? `From: ${updatedContext.startLocation}` : ''}
+${updatedContext.duration || updatedContext.startDate ? `Duration: ${updatedContext.duration || updatedContext.startDate}` : ''}
+${updatedContext.travelers ? `Travelers: ${updatedContext.travelers}` : ''}
+
+Please help me complete the missing information.`;
+
+        // Hide confirmation dialog and continue conversation
+        setShowSummaryConfirmation(false);
+        
+        // Set the message and send it
+        setNewMessage(contextMessage);
+        setTimeout(async () => {
+          await handleSendMessage();
+        }, 100);
+      }
+    } catch (error) {
+      console.error('Error updating trip context:', error);
+    }
+  };
+
   // Handle preferences expansion - reopen preferences component
   const handlePreferencesExpand = () => {
     setPreferencesShown(true);
-    setShowDestinations(false);
+    // Keep destinations visible so user can see real-time updates
+    // setShowDestinations(false); // Removed this line
     setShowSummaryConfirmation(false);
   };
 
@@ -844,42 +1066,15 @@ Your detailed travel plan will be ready in just a moment... 🌟`,
           ))}
 
           {showSummaryConfirmation && (
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-6 mb-4">
-              <h3 className="text-lg font-semibold text-purple-900 mb-4">Confirm Your Trip Details</h3>
-              <div className="space-y-3 mb-6">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-purple-800">📍 Destination:</span>
-                  <span className="text-purple-700">{tripContext.destination || 'Not specified'}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-purple-800">🚀 Start Location:</span>
-                  <span className="text-purple-700">{tripContext.startLocation || 'Not specified'}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-purple-800">👥 Travelers:</span>
-                  <span className="text-purple-700">{tripContext.travelers || 'Not specified'}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-purple-800">📅 Duration:</span>
-                  <span className="text-purple-700">{tripContext.duration || tripContext.startDate || 'Not specified'}</span>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <Button
-                  onClick={handleSummaryConfirm}
-                  className="bg-purple-600 hover:bg-purple-700 text-white"
-                >
-                  ✅ Confirm & Continue
-                </Button>
-                <Button
-                  onClick={handleSummaryEdit}
-                  variant="outline"
-                  className="border-purple-300 text-purple-700 hover:bg-purple-50"
-                >
-                  ✏️ Edit Details
-                </Button>
-              </div>
-            </div>
+            <TripConfirmationDialog 
+              tripContext={tripContext}
+              onConfirm={handleSummaryConfirm}
+              onUpdate={(updatedContext) => {
+                setTripContext(updatedContext);
+                // Re-validate with Gemini if needed
+                handleTripContextUpdate(updatedContext);
+              }}
+            />
           )}
 
           {preferencesShown &&
