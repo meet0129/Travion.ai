@@ -4,18 +4,16 @@ import { v4 as uuidv4 } from "uuid";
 import {
   AlertCircle,
   Bot,
-  User as UserIcon,
   ThumbsUp,
   ThumbsDown,
   RotateCcw,
-  Send,
   Edit2,
   Check,
   X,
+  ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import userAvatar from "../assets/default-avatar.svg";
 import logo from "@/assets/travion_logo.png";
 import Sidebar from "../components/Sidebar";
 import {
@@ -1089,7 +1087,8 @@ Your detailed travel plan will be ready in just a moment... 🌟`,
               {message.type === "ai" ? (
                 <div className="flex items-start gap-3 max-w-[92%]">
                   <div className="h-8 w-8 rounded-full bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center flex-shrink-0">
-                    <Bot className="h-4 w-4 text-violet-600 dark:text-violet-300" />
+                    {/* <Bot className="h-4 w-4 text-violet-600 dark:text-violet-300" /> */}
+                    <img src={logo} alt="Travion logo" className="w-6 h-6 rounded-lg object-contain text-violet-600 dark:text-violet-300" />
                   </div>
                   <div className="flex-1">
                     <div className="text-xs font-semibold text-violet-700 dark:text-violet-300 mb-1">
@@ -1245,7 +1244,7 @@ Your detailed travel plan will be ready in just a moment... 🌟`,
                   }`}
                   aria-label="Send"
                 >
-                  <Send className="w-4 h-4" />
+                  <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
             </div>
