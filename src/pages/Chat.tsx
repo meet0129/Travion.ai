@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import userAvatar from "../assets/default-avatar.svg";
+import logo from "@/assets/travion_logo.png";
 import Sidebar from "../components/Sidebar";
 import {
   initializeGemini,
@@ -26,6 +27,8 @@ import PreferencesWidget from "../components/PreferencesWidget";
 import PreferencesFolded from "../components/PreferencesFolded";
 import Destinations from "../pages/Destinations";
 import { useTrips } from "../contexts/TripsContext";
+import { useAuth } from "@/contexts/AuthContext";
+
 import { firebaseChatService } from "../lib/firebaseService";
 
 // Trip Confirmation Dialog Component with Inline Editing
@@ -173,6 +176,7 @@ const Chat = () => {
   const navigate = useNavigate();
   const { chatId } = useParams();
   const { saveTrip } = useTrips();
+  const { currentUser } = useAuth();
   const [messages, setMessages] = useState([]);
   const [currentChatId, setCurrentChatId] = useState(chatId || uuidv4());
 
@@ -388,20 +392,70 @@ const Chat = () => {
             if (persistedMessages) {
               setMessages(JSON.parse(persistedMessages));
             } else {
-              // Check for initial trip description and create contextual greeting
+              // If coming from hero submit, we'll auto-send the prompt; otherwise show default greeting
               const initialDescription = localStorage.getItem('initialTripDescription');
-              let greeting;
-              
-              if (initialDescription) {
-                greeting = `Great! I see you're interested in: "${initialDescription}"\n\nLet me ask you a few quick questions to plan your perfect trip! 🌟\n\nFirst, which specific destination in India are you most excited about?`;
-                localStorage.removeItem('initialTripDescription');
+              if (!initialDescription) {
+                const greeting = geminiService.getInitialGreeting();
+                setMessages([
+                  { type: "ai", content: greeting, timestamp: new Date() },
+                ]);
               } else {
-                greeting = geminiService.getInitialGreeting();
+                // Show AI greeting first, then send the user's initial prompt as reply
+                const greeting = geminiService.getInitialGreeting();
+                const initial = initialDescription;
+                localStorage.removeItem('initialTripDescription');
+                const aiGreeting = { type: "ai", content: greeting, timestamp: new Date() };
+                setMessages([aiGreeting]);
+                try {
+                  const messagesKey = `messages_${currentChatId}`;
+                  sessionStorage.setItem(messagesKey, JSON.stringify([aiGreeting]));
+                } catch {}
+
+                setTimeout(async () => {
+                  const firstUser = {
+                    type: "user",
+                    content: initial,
+                    timestamp: new Date(),
+                  };
+                  const msgsAfterUser = [aiGreeting, firstUser];
+                  setMessages(msgsAfterUser);
+                  try {
+                    const messagesKey = `messages_${currentChatId}`;
+                    sessionStorage.setItem(messagesKey, JSON.stringify(msgsAfterUser));
+                  } catch {}
+                  setHasUserInteracted(true);
+
+                  try {
+                    const aiResponse = await processMessage(initial);
+                    const finalMessages = [
+                      aiGreeting,
+                      firstUser,
+                      { type: "ai", content: aiResponse, timestamp: new Date() },
+                    ];
+                    setMessages(finalMessages);
+                    try {
+                      const messagesKey = `messages_${currentChatId}`;
+                      sessionStorage.setItem(messagesKey, JSON.stringify(finalMessages));
+                    } catch {}
+                  } catch (e) {
+                    const fallbackMessages = [
+                      aiGreeting,
+                      firstUser,
+                      {
+                        type: "ai",
+                        content:
+                          "Oops! Something went wrong on my end. Mind giving that another shot? 🔄",
+                        timestamp: new Date(),
+                      },
+                    ];
+                    setMessages(fallbackMessages);
+                    try {
+                      const messagesKey = `messages_${currentChatId}`;
+                      sessionStorage.setItem(messagesKey, JSON.stringify(fallbackMessages));
+                    } catch {}
+                  }
+                }, 150);
               }
-              
-              setMessages([
-                { type: "ai", content: greeting, timestamp: new Date() },
-              ]);
             }
           } catch {}
 
@@ -1029,7 +1083,7 @@ Your detailed travel plan will be ready in just a moment... 🌟`,
           </div>
         )}
 
-        <div className="space-y-8 mb-28">
+        <div className="space-y-8 mb-36">
           {messages.map((message, index) => (
             <div key={index} className={`flex items-start gap-3`}>
               {message.type === "ai" ? (
@@ -1080,7 +1134,7 @@ Your detailed travel plan will be ready in just a moment... 🌟`,
               ) : (
                 <div className="flex items-start gap-3 max-w-[92%]">
                   <img
-                    src={userAvatar}
+                    src={currentUser?.photoURL}
                     alt="You"
                     className="h-8 w-8 rounded-full border border-slate-200 dark:border-slate-800 flex-shrink-0"
                   />
@@ -1169,24 +1223,31 @@ Your detailed travel plan will be ready in just a moment... 🌟`,
           <div ref={messagesEndRef} />
         </div>
 
-        <div className="sticky bottom-0 bg-gradient-to-t from-slate-50 via-slate-50/95 to-transparent dark:from-slate-900 dark:via-slate-900/95 pt-4">
-          <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-lg rounded-2xl shadow-xl overflow-hidden border border-slate-200/50 dark:border-slate-700/50">
-            <div className="flex items-end gap-2 p-4">
-              <textarea
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Type your message..."
-                className="flex-1 bg-transparent border-0 focus:ring-0 resize-none h-10 max-h-40 overflow-auto"
-                style={{ height: "40px" }}
-              />
-              <button
-                onClick={handleSendMessage}
-                disabled={!newMessage.trim() || !isGeminiInitialized}
-                className="bg-blue-500 text-white px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-600 transition-colors"
-              >
-                Send
-              </button>
+        <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white/90 to-transparent dark:from-slate-950 dark:via-slate-950/95 py-4">
+          <div className="max-w-3xl mx-auto px-4">
+            <div className="rounded-full p-[1px] bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 dark:from-slate-800 dark:via-slate-800 dark:to-slate-800 shadow-[0_6px_24px_rgba(0,0,0,0.08)]">
+              <div className="flex items-center rounded-full bg-white dark:bg-slate-900 pl-3 pr-2" style={{height: "50px"}}>
+                <img src={logo} alt="Travion" className="w-8 h-8 rounded object-contain opacity-80 mr-2 shrink-0" />
+                <textarea
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="Ask Travion..."
+                  className="flex-1 bg-transparent border-0 focus:outline-none focus:ring-0 resize-none h-[22px] max-h-28 overflow-auto text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 placeholder:text-[15px] focus:placeholder-transparent transition-colors py-0"
+                />
+                <button
+                  onClick={handleSendMessage}
+                  disabled={!newMessage.trim() || !isGeminiInitialized}
+                  className={`ml-2 w-10 h-10 inline-flex items-center justify-center rounded-full transition-all shrink-0 ${
+                    !newMessage.trim() || !isGeminiInitialized
+                      ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                      : "bg-slate-200/80 hover:bg-slate-300 text-slate-600 dark:bg-slate-700/70 dark:text-slate-200 dark:hover:bg-slate-700"
+                  }`}
+                  aria-label="Send"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
         </div>

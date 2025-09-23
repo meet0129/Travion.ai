@@ -8,6 +8,7 @@ import MyTrips from "@/components/MyTrips";
 import { v4 as uuidv4 } from "uuid";
 import { geminiService } from "@/lib/gemini";
 import { useTrips } from "@/contexts/TripsContext";
+import logo from "@/assets/travion_logo.png";
 
 const Sidebar = () => {
   const [isCollapsed, setIsCollapsed] = useState(true);
@@ -109,6 +110,22 @@ const Sidebar = () => {
     }
   };
 
+  const handelNewTrip =  async () => {
+    // Save current chat before creating new one
+    await saveCurrentChat();
+                  
+    const newChatId = uuidv4();
+    sessionStorage.setItem('currentChatId', newChatId);
+    // Clear any existing chat data for fresh start
+    sessionStorage.removeItem(`tripContext_${newChatId}`);
+    sessionStorage.removeItem(`messages_${newChatId}`);
+    localStorage.removeItem(`tripData_${newChatId}`);
+    localStorage.removeItem('initialTripDescription');
+    
+    navigate(`/chat/${newChatId}`);
+    setIsCollapsed(true);
+  }
+
   return (
     <>
       {/* Single Sidebar Container with Smooth Transitions */}
@@ -123,14 +140,12 @@ const Sidebar = () => {
           {/* Brand Icon */}
           <div className="p-3 border-b border-border/50">
             <Button
-              variant="ghost"
+              variant="logo"
               size="sm"
-              className="w-10 h-10 p-0 hover:bg-primary/10 rounded-xl"
+              className="w-12 h-12 p-0"
               onClick={() => setIsCollapsed(false)}
             >
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-purple-600 to-pink-500 flex items-center justify-center hover:rotate-12 transition-transform duration-300">
-                <span className="text-lg">✈️</span>
-              </div>
+              <img src={logo} alt="Travion logo" className="w-10 h-10 rounded-lg object-contain hover:scale-105 transition-transform duration-200" />
             </Button>
           </div>
 
@@ -196,16 +211,12 @@ const Sidebar = () => {
           <div className="p-4">
             <div className="flex items-center justify-between mb-8">
               <div 
-                className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-2 rounded-lg transition-colors group"
+                className="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:scale-105 transition-transform duration-300"
                 onClick={handleBrandClick}
               >
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-purple-600 to-pink-500 flex items-center justify-center group-hover:scale-105 transition-transform duration-200">
-                  <span className="text-lg">✈️</span>
-                </div>
+                <img src={logo} alt="Travion logo" className="w-10 h-10 rounded-lg object-contain transition-transform duration-200" />
                 <div className="flex items-center gap-2">
-                  <span className="text-xl font-bold text-foreground">
-                    Travion<span className="font-normal">.ai</span>
-                  </span>
+                <span className="text-2xl font-bold transition-transform duration-200">Travion<span className="font-normal">.ai</span></span>
                 </div>
               </div>
             </div>
@@ -225,21 +236,7 @@ const Sidebar = () => {
             {currentUser && (
               <Button
                 className="w-full text-center py-2.5 rounded-full text-white font-semibold bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 transition-all duration-200"
-                onClick={async () => {
-                  // Save current chat before creating new one
-                  await saveCurrentChat();
-                  
-                  const newChatId = uuidv4();
-                  sessionStorage.setItem('currentChatId', newChatId);
-                  // Clear any existing chat data for fresh start
-                  sessionStorage.removeItem(`tripContext_${newChatId}`);
-                  sessionStorage.removeItem(`messages_${newChatId}`);
-                  localStorage.removeItem(`tripData_${newChatId}`);
-                  localStorage.removeItem('initialTripDescription');
-                  
-                  navigate(`/chat/${newChatId}`);
-                  setIsCollapsed(true);
-                }}
+                onClick={handelNewTrip}
               >
                 New Trip
               </Button>
