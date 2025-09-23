@@ -34,26 +34,26 @@ const HeroSection = () => {
   };
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen ">
       {/* Sidebar */}
       <Sidebar />
       
       {/* Main content area with full gradient background */}
       <div className="flex-1 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 min-h-screen">
-        <div className="flex items-center justify-center min-h-screen px-4 py-8">
+        <div className="flex items-center justify-center min-h-screen px-6 py-6">
           <div className="w-full max-w-4xl space-y-8 text-center">
             {/* Logo and Title Section */}
             <div className="space-y-4 mb-8">
-              <div className="flex items-center justify-center gap-1 mb-6">
-                <img src={logo} alt="Travion logo" className="w-12 h-12 rounded-lg object-contain" />
-                <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">
-                <span className="text-3xl font-bold ">Travion<span className="font-normal">.ai</span></span>
+              <div className="flex items-center justify-center gap-1 mb-1">
+                <img src={logo} alt="Travion logo" className="w-14 h-14 rounded-lg object-contain" />
+                <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-100">
+                <span className="text-4xl font-bold ">Travion<span className="font-normal">.ai</span></span>
                 </h1>
               </div>
-              <h3 className="text-xl text-slate-800 dark:text-slate-200 font-semibold mb-2">
+              <h3 className="text-l text-slate-800 dark:text-slate-200 font-semibold mb-1">
                 Smart Travel Planning
               </h3>
-              <h4 className="text-lg text-slate-600 dark:text-slate-400 font-medium">
+              <h4 className="text-lg text-slate-600 dark:text-slate-400 font-normal mb-2">
                 From dream destinations to detailed itineraries
               </h4>
             </div>
