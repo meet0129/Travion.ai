@@ -2,6 +2,7 @@ import { useLocation, Link } from "react-router-dom";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Home, ArrowLeft } from "lucide-react";
+import logo from "@/assets/travion_logo2.0.png";
 
 const NotFound = () => {
   const location = useLocation();
@@ -14,17 +15,27 @@ const NotFound = () => {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="text-center max-w-md w-full">
         {/* Brand Logo */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-purple-600 to-pink-500 flex items-center justify-center">
-          <span className="text-lg">✈️</span>
-        </div>
-          <span className="text-2xl lg:text-3xl font-bold text-foreground">Travion</span>
+        <div className="flex items-center justify-center gap-1 mb-1">
+          <img
+            src={logo}
+            alt="Travion logo"
+            className="w-14 h-14 rounded-lg object-contain"
+          />
+          <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-100">
+            <span className="text-4xl font-bold ">
+              Travion<span className="font-normal">.ai</span>
+            </span>
+          </h1>
         </div>
 
         {/* 404 Error */}
         <div className="mb-8">
-          <h1 className="text-6xl lg:text-8xl font-bold text-primary mb-4">404</h1>
-          <h2 className="text-xl lg:text-2xl font-semibold text-foreground mb-2">Page Not Found</h2>
+          <h1 className="text-6xl lg:text-8xl font-bold text-primary mb-4">
+            404
+          </h1>
+          <h2 className="text-xl lg:text-2xl font-semibold text-foreground mb-2">
+            Page Not Found
+          </h2>
           <p className="text-base lg:text-lg text-muted-foreground mb-6">
             The page you're looking for doesn't exist or has been moved.
           </p>
@@ -38,8 +49,8 @@ const NotFound = () => {
               Go Home
             </Link>
           </Button>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             className="w-full sm:w-auto"
             onClick={() => window.history.back()}
           >
