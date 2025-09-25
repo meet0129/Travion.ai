@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import logo from "@/assets/travion_logo.png";
+import logo from "@/assets/travion_logo2.0.png";
 import Sidebar from "../components/Sidebar";
 import {
   initializeGemini,
@@ -301,6 +301,9 @@ const Chat = () => {
   const [showSummaryConfirmation, setShowSummaryConfirmation] = useState(false);
   const [selectedPreferences, setSelectedPreferences] = useState([]);
   const messagesEndRef = useRef(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const composerRef = useRef<HTMLDivElement | null>(null);
+  const [isComposerActive, setIsComposerActive] = useState(false);
 
   // Persist UI state
   useEffect(() => {
@@ -475,6 +478,33 @@ const Chat = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Auto-resize textarea height based on content
+  const autoResizeTextarea = () => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const maxHeightPx = 160; // cap growth to avoid covering screen
+    el.style.height = '22px';
+    const newHeight = Math.min(el.scrollHeight, maxHeightPx);
+    el.style.height = `${newHeight}px`;
+    el.style.overflowY = el.scrollHeight > maxHeightPx ? 'auto' : 'hidden';
+  };
+
+  useEffect(() => {
+    autoResizeTextarea();
+  }, [newMessage]);
+
+  // Show border only when focused; hide when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (!composerRef.current) return;
+      if (!composerRef.current.contains(e.target as Node)) {
+        setIsComposerActive(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Extract trip information from message
   const extractTripInfo = (message, currentContext) => {
@@ -1096,7 +1126,7 @@ Your detailed travel plan will be ready in just a moment... 🌟`,
                     </div>
                     <div className="rounded-none border-0 bg-transparent p-0">
                       <div className="prose dark:prose-invert max-w-none">
-                        <div
+                        <div className="font-[Sans-Serif] text-[14px] leading-[20px]"
                           dangerouslySetInnerHTML={{
                             __html: message.content.replace(/\n/g, "<br>"),
                           }}
@@ -1142,7 +1172,7 @@ Your detailed travel plan will be ready in just a moment... 🌟`,
                       You
                     </div>
                     <div className="p-0">
-                      <div className="whitespace-pre-wrap text-slate-900 dark:text-slate-100">
+                      <div className="font-[Sans-Serif] text-[14px] leading-[20px] whitespace-pre-wrap text-slate-900 dark:text-slate-100">
                         {message.content}
                       </div>
                     </div>
@@ -1224,29 +1254,40 @@ Your detailed travel plan will be ready in just a moment... 🌟`,
 
         <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white/90 to-transparent dark:from-slate-950 dark:via-slate-950/95 py-4">
           <div className="max-w-3xl mx-auto px-4">
-            <div className="rounded-full p-[1px] bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 dark:from-slate-800 dark:via-slate-800 dark:to-slate-800 shadow-[0_6px_24px_rgba(0,0,0,0.08)]">
-              <div className="flex items-center rounded-full bg-white dark:bg-slate-900 pl-3 pr-2" style={{height: "50px"}}>
-                <img src={logo} alt="Travion" className="w-8 h-8 rounded object-contain opacity-80 mr-2 shrink-0" />
-                <textarea
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Ask Travion..."
-                  className="flex-1 bg-transparent border-0 focus:outline-none focus:ring-0 resize-none h-[22px] max-h-28 overflow-auto text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 placeholder:text-[15px] focus:placeholder-transparent transition-colors py-0"
-                />
-                <button
-                  onClick={handleSendMessage}
-                  disabled={!newMessage.trim() || !isGeminiInitialized}
-                  className={`ml-2 w-10 h-10 inline-flex items-center justify-center rounded-full transition-all shrink-0 ${
-                    !newMessage.trim() || !isGeminiInitialized
-                      ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                      : "bg-slate-200/80 hover:bg-slate-300 text-slate-600 dark:bg-slate-700/70 dark:text-slate-200 dark:hover:bg-slate-700"
-                  }`}
-                  aria-label="Send"
-                >
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
+            <div
+              ref={composerRef}
+              onClick={() => textareaRef.current?.focus()}
+              className={`relative flex items-center transition-all duration-200 rounded-3xl bg-white dark:bg-slate-900 ${
+                isComposerActive
+                  ? 'border border-violet-400 shadow-[0_8px_30px_rgba(167,139,250,0.20)]'
+                  : 'border border-slate-200 shadow-[0_6px_24px_rgba(0,0,0,0.06)]'
+              }`}
+              style={{ minHeight: "46px" }}
+            >
+              <img src={logo} alt="Travion" className="absolute left-3 top-1/2 -translate-y-1/2 w-6 h-6 inline-flex items-center justify-center rounded-full transition-all object-contain" />
+              <textarea
+                ref={textareaRef}
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onInput={autoResizeTextarea}
+                onKeyPress={handleKeyPress}
+                onFocus={() => setIsComposerActive(true)}
+                placeholder="Ask Travion..."
+                className="composer-textarea bg-transparent border-0 focus:outline-none focus:ring-0 resize-none min-h-[20px] max-h-48 overflow-auto text-[13px] leading-[20px] text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:placeholder-transparent transition-colors py-3 pl-12 pr-4 font-normal"
+                style={{ width: 'calc(100% - 64px)' }}
+              />
+              <button
+                onClick={handleSendMessage}
+                disabled={!newMessage.trim() || !isGeminiInitialized}
+                className={`absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 inline-flex items-center justify-center rounded-full transition-all z-10 ${
+                  !newMessage.trim() || !isGeminiInitialized
+                    ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                    : "bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white shadow-sm hover:brightness-105"
+                }`}
+                aria-label="Send"
+              >
+                <ArrowRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>

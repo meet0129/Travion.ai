@@ -6,15 +6,15 @@ import Sidebar from '@/components/Sidebar';
 import MapEmbed from '@/components/MapEmbed';
 import PreferencesFolded from '@/components/PreferencesFolded';
 import { useTrips } from '@/contexts/TripsContext';
-import { 
-  Plus, 
-  X, 
-  Users, 
-  ChevronDown, 
-  Settings, 
-  MapPin, 
-  ThumbsUp, 
-  ThumbsDown, 
+import {
+  Plus,
+  X,
+  Users,
+  ChevronDown,
+  Settings,
+  MapPin,
+  ThumbsUp,
+  ThumbsDown,
   RotateCcw,
   Loader2
 } from 'lucide-react';
@@ -87,7 +87,7 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
       const persistedSelected = sessionStorage.getItem(`dest_selected_${chatId}${destinationKey}`);
       const persistedSuggested = sessionStorage.getItem(`dest_suggested_${chatId}${destinationKey}`);
       const persistedUi = sessionStorage.getItem(`dest_ui_${chatId}${destinationKey}`);
-      
+
       // Only restore if we have a valid destination and the data exists
       if (tripData.destination && persistedSelected) {
         setSelectedDestinations(JSON.parse(persistedSelected));
@@ -102,14 +102,14 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
         if (ui.startDestination) setStartDestination(ui.startDestination);
         if (ui.endDestination) setEndDestination(ui.endDestination);
       }
-      
+
       // If no persisted data and we have a destination, start loading
       if (tripData.destination && !persistedSelected) {
         setInitialLoading(true);
       } else if (tripData.destination && persistedSelected) {
         setInitialLoading(false);
       }
-    } catch {}
+    } catch { }
   }, [chatId, tripData.destination]);
 
   // Persist destinations/suggestions/ui state (destination-specific)
@@ -117,21 +117,21 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
     try {
       const destinationKey = tripData.destination ? `_${tripData.destination.replace(/\s+/g, '_')}` : '';
       sessionStorage.setItem(`dest_selected_${chatId}${destinationKey}`, JSON.stringify(selectedDestinations));
-    } catch {}
+    } catch { }
   }, [selectedDestinations, chatId, tripData.destination]);
 
   useEffect(() => {
     try {
       const destinationKey = tripData.destination ? `_${tripData.destination.replace(/\s+/g, '_')}` : '';
       sessionStorage.setItem(`dest_suggested_${chatId}${destinationKey}`, JSON.stringify(suggestedDestinations));
-    } catch {}
+    } catch { }
   }, [suggestedDestinations, chatId, tripData.destination]);
 
   useEffect(() => {
     try {
       const destinationKey = tripData.destination ? `_${tripData.destination.replace(/\s+/g, '_')}` : '';
       sessionStorage.setItem(`dest_ui_${chatId}${destinationKey}`, JSON.stringify({ showSuggestions, startDestination, endDestination }));
-    } catch {}
+    } catch { }
   }, [showSuggestions, startDestination, endDestination, chatId, tripData.destination]);
 
   // Load initial destinations based on preferences
@@ -140,29 +140,29 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
       setInitialLoading(false);
       return;
     }
-    
+
     setInitialLoading(true);
     setLoading(true);
     // Clear any existing destinations to prevent showing random places
     setSelectedDestinations([]);
     setSuggestedDestinations([]);
-    
+
     try {
       // Get chat-specific preferences only
       const currentChatId = sessionStorage.getItem('currentChatId');
-      const selectedPreferences = currentChatId 
+      const selectedPreferences = currentChatId
         ? JSON.parse(localStorage.getItem(`selectedPreferences_${currentChatId}`) || '[]')
         : [];
-      
+
       const allPlacesData = await fetchAllCategoriesForDestination(tripData.destination, apiKey);
-      
+
       // Filter and flatten places based on selected preferences
       const filteredPlaces = Object.entries(allPlacesData)
         .filter(([category, places]) => selectedPreferences.includes(category))
         .flatMap(([category, places]) => places)
         .filter(place => place.name && place.address && place.rating >= 4.0 && place.photoUrl)
         .slice(0, 3); // Take top 3 places
-      
+
       setSelectedDestinations(filteredPlaces);
     } catch (error) {
       // Error loading destinations - keep destinations empty
@@ -188,7 +188,7 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
           setSuggestedDestinations(prev => prev.filter(p => !newOnes.some(n => n.id === p.id)));
         }
       }
-    } catch {}
+    } catch { }
   };
 
   // Listen for preference changes (within same tab via polling micro-task + storage for cross-tab)
@@ -217,14 +217,14 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
   // Load suggestions based on selected places
   const loadSuggestions = async (limit: number = 10) => {
     if (!apiKey || !tripData.destination) return;
-    
+
     setLoadingSuggestions(true);
     try {
       let suggestions: PlaceItem[] = [];
-      
+
       if (selectedDestinations.length > 0) {
         // Get similar places based on selected destinations
-        const similarPromises = selectedDestinations.slice(0, 2).map(place => 
+        const similarPromises = selectedDestinations.slice(0, 2).map(place =>
           similarPlacesByPlace(place, apiKey, 5)
         );
         const similarResults = await Promise.all(similarPromises);
@@ -232,20 +232,20 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
           .filter(place => place.name && place.address && place.rating >= 4.0 && place.photoUrl)
           .filter(place => !selectedDestinations.some(selected => selected.id === place.id));
       }
-      
+
       // If not enough suggestions, get general places
       if (suggestions.length < limit) {
-      const allPlacesData = await fetchAllCategoriesForDestination(tripData.destination, apiKey);
-      const allPlaces = Object.values(allPlacesData).flat();
+        const allPlacesData = await fetchAllCategoriesForDestination(tripData.destination, apiKey);
+        const allPlaces = Object.values(allPlacesData).flat();
         const generalPlaces = allPlaces
-        .filter(place => place.name && place.address && place.rating >= 4.0 && place.photoUrl)
-        .filter(place => !selectedDestinations.some(selected => selected.id === place.id))
+          .filter(place => place.name && place.address && place.rating >= 4.0 && place.photoUrl)
+          .filter(place => !selectedDestinations.some(selected => selected.id === place.id))
           .filter(place => !suggestions.some(s => s.id === place.id))
           .slice(0, limit - suggestions.length);
-        
+
         suggestions = [...suggestions, ...generalPlaces];
       }
-      
+
       const finalSuggestions = suggestions.slice(0, limit);
       setSuggestedDestinations(finalSuggestions);
     } catch (error) {
@@ -286,7 +286,7 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
     try {
       const currentCount = suggestedDestinations.length;
       const needed = Math.max(0, 10 - currentCount);
-      
+
       if (needed > 0) {
         const similarPlaces = await similarPlacesByPlace(addedPlace, apiKey, needed + 2);
         const filteredPlaces = similarPlaces
@@ -294,7 +294,7 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
           .filter(place => !selectedDestinations.some(selected => selected.id === place.id))
           .filter(place => !suggestedDestinations.some(suggested => suggested.id === place.id))
           .slice(0, needed);
-        
+
         if (filteredPlaces.length > 0) {
           setSuggestedDestinations(prev => [...prev, ...filteredPlaces]);
         }
@@ -317,7 +317,7 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
       try {
         const destinationKey = tripData.destination ? `_${tripData.destination.replace(/\s+/g, '_')}` : '';
         sessionStorage.setItem(`dest_selected_${chatId}${destinationKey}`, JSON.stringify(updated));
-      } catch {}
+      } catch { }
       return updated;
     });
   };
@@ -388,20 +388,20 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
   return (
     <div className="h-screen bg-white font-['Inter',sans-serif] flex flex-col">
       <Sidebar />
-      
+
       {/* Main Content - Single Card Layout */}
-        <div className="flex-1 p-4 overflow-y-auto">
+      <div className="flex-1 p-4 overflow-y-auto">
         <div className="max-w-7xl mx-auto">
           <Card className="border border-purple-200 rounded-2xl bg-white shadow-lg">
             <div className="p-4">
-            {/* Header */}
+              {/* Header */}
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <h1 className="text-xl font-bold text-purple-900 mb-1">
                     Choose Trip Destinations
                   </h1>
                   <p className="text-xs text-gray-600">
-                    Pick all the places where you will spend at least one night
+                  Select places to stay overnight
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -418,252 +418,249 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
                       Trip Preferences
                     </span>
                     <Settings className="w-3 h-3 text-purple-600" />
+                  </div>
                 </div>
               </div>
-            </div>
 
               {/* Main Content Layout */}
-              <div className="grid grid-cols-5 gap-4">
+              <div className="grid grid-cols-4 gap-4">
                 {/* Left Column - Destinations */}
                 <div className="col-span-2">
-            {/* Start/End Inputs */}
+                  {/* Start/End Inputs */}
                   <div className="grid grid-cols-2 gap-2 mb-3">
-              <div className="space-y-1">
+                    <div className="space-y-1">
                       <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                  START
-                </label>
+                        START
+                      </label>
                       <div className="border border-gray-300 rounded-md px-2 py-1 text-gray-700 text-xs text-center bg-white">
-                  {startDestination}
-                </div>
-              </div>
-              <div className="space-y-1">
+                        {startDestination}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
                       <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                  END
-                </label>
+                        END
+                      </label>
                       <div className="border border-gray-300 rounded-md px-2 py-1 text-gray-700 text-xs text-center bg-white">
-                  {endDestination}
-                </div>
-              </div>
-            </div>
+                        {endDestination}
+                      </div>
+                    </div>
+                  </div>
 
-            {/* Chosen Destinations */}
+                  {/* Chosen Destinations */}
                   <div className="mb-3">
                     <h3 className="text-sm font-semibold text-gray-900 mb-1">
-                  Chosen Destinations ({selectedDestinations.length})
-                </h3>
-                    <p className="text-xs text-gray-600 mb-2">
-                      Chosen by Travion.ai based on the conversation. You can Add to, Remove from, or Reorder this list.
-                    </p>
+                      Chosen Destinations ({selectedDestinations.length})
+                    </h3>
 
                     {initialLoading ? (
                       <LoadingSkeleton />
                     ) : (
                       <div className="space-y-1 mb-2">
-                {selectedDestinations.map((destination, index) => (
-                        <Card key={`selected-${destination.id}-${index}`} className="p-2 border border-gray-200 rounded-md bg-white hover:shadow-sm transition-shadow h-16">
-                          <div className="flex items-center gap-2 h-full">
-                      <div className="relative flex-shrink-0">
-                        <img 
-                                src={destination.photoUrl || "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=50&h=40&fit=crop&q=80"}
-                          alt={destination.name}
-                                className="w-12 h-10 rounded-md object-cover"
-                        />
-                      </div>
-                      
-                      <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between">
-                                <div className="flex-1 min-w-0">
-                                  <h4 className="font-medium text-gray-900 text-xs line-clamp-1">
-                            {destination.name}
-                          </h4>
-                                  <div className="flex items-center gap-2 mt-1">
-                                    {destination.rating && (
-                                      <div className="flex items-center gap-1">
-                                        <span className="text-yellow-500 text-xs">★</span>
-                                        <span className="text-xs text-gray-600">{destination.rating.toFixed(1)}</span>
-                                      </div>
-                                    )}
-                                    {destination.priceLevel && (
-                                      <span className="text-xs text-gray-500">
-                                        {'$'.repeat(destination.priceLevel)}
-                                      </span>
-                                    )}
+                        {selectedDestinations.map((destination, index) => (
+                          <Card key={`selected-${destination.id}-${index}`} className="p-2 border border-gray-200 rounded-md bg-white hover:shadow-sm transition-shadow h-16">
+                            <div className="flex items-center gap-2 h-full">
+                              <div className="relative flex-shrink-0">
+                                <img
+                                  src={destination.photoUrl || "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=50&h=40&fit=crop&q=80"}
+                                  alt={destination.name}
+                                  className="w-12 h-10 rounded-md object-cover"
+                                />
+                              </div>
+
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1 min-w-0">
+                                    <h4 className="font-medium text-gray-900 text-xs line-clamp-1">
+                                      {destination.name}
+                                    </h4>
+                                    <div className="flex items-center gap-2 mt-1">
+                                      {destination.rating && (
+                                        <div className="flex items-center gap-1">
+                                          <span className="text-yellow-500 text-xs">★</span>
+                                          <span className="text-xs text-gray-600">{destination.rating.toFixed(1)}</span>
+                                        </div>
+                                      )}
+                                      {destination.priceLevel && (
+                                        <span className="text-xs text-gray-500">
+                                          {'$'.repeat(destination.priceLevel)}
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeDestination(destination.id)}
+                                    className="h-4 w-4 p-0 hover:bg-gray-100 rounded-full flex-shrink-0"
+                                  >
+                                    <X className="w-3 h-3 text-gray-500" />
+                                  </Button>
                                 </div>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={() => removeDestination(destination.id)}
-                                  className="h-4 w-4 p-0 hover:bg-gray-100 rounded-full flex-shrink-0"
-                          >
-                            <X className="w-3 h-3 text-gray-500" />
-                          </Button>
-                        </div>
+                              </div>
+                            </div>
+                          </Card>
+                        ))}
                       </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
                     )}
 
                     <div className="mb-2">
-                <Button 
-                  variant="outline" 
-                        onClick={async () => { 
-                          setShowSuggestions(true); 
-                          if (suggestedDestinations.length === 0) { 
-                            await loadSuggestions(10); 
-                          } 
+                      <Button
+                        variant="outline"
+                        onClick={async () => {
+                          setShowSuggestions(true);
+                          if (suggestedDestinations.length === 0) {
+                            await loadSuggestions(10);
+                          }
                         }}
                         disabled={loadingSuggestions}
                         className="w-full flex items-center justify-center gap-1 h-8 rounded-md border-2 border-dashed border-purple-300 hover:border-purple-400 hover:bg-purple-50 transition-colors bg-white text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loadingSuggestions ? (
-                    <Loader2 className="w-3 h-3 text-purple-600 animate-spin" />
-                  ) : (
-                    <Plus className="w-3 h-3 text-purple-600" />
-                  )}
-                  {loadingSuggestions ? 'Loading suggestions...' : 'Add Another Destination'}
-                </Button>
-              </div>
-              
-              {/* Show suggestions count only when suggestions are visible */}
-              {showSuggestions && (
-                <p className="text-xs text-center text-purple-600 mb-2">
-                  ({suggestedDestinations.length} Suggestions)
-                </p>
-              )}
+                      >
+                        {loadingSuggestions ? (
+                          <Loader2 className="w-3 h-3 text-purple-600 animate-spin" />
+                        ) : (
+                          <Plus className="w-3 h-3 text-purple-600" />
+                        )}
+                        {loadingSuggestions ? 'Loading suggestions...' : 'Add Another Destination'}
+                      </Button>
+                    </div>
 
-              {/* Suggestions */}
-              {showSuggestions && (
+                    {/* Show suggestions count only when suggestions are visible */}
+                    {showSuggestions && (
+                      <p className="text-xs text-center text-purple-600 mb-2">
+                        ({suggestedDestinations.length} Suggestions)
+                      </p>
+                    )}
+
+                    {/* Suggestions */}
+                    {showSuggestions && (
                       <div className="mb-2">
-                  <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center justify-between mb-2">
                           <div className="text-xs font-medium text-gray-700">Suggestions for you</div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => {
                               setShowSuggestions(false);
                             }}
                             className="text-xs text-gray-500 hover:text-gray-700 h-6 px-2"
-                      >
-                        Hide
-                      </Button>
-                    </div>
+                          >
+                            Hide
+                          </Button>
+                        </div>
                         {loadingSuggestions ? (
                           <SuggestionsLoadingSkeleton />
                         ) : suggestedDestinations.length > 0 ? (
-                        <div className="space-y-1 max-h-48 overflow-y-auto">
-                    {suggestedDestinations.map((s, index) => (
-                      <div
-                        key={`suggested-${s.id}-${index}`}
-                        title={s.name}
-                              className="border border-gray-200 rounded-md bg-white shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer p-2 h-12"
-                        onMouseEnter={() => setHoveredPlace(s.id)}
-                        onMouseLeave={() => setHoveredPlace(null)}
-                        onClick={async () => {
-                          addDestination(s);
-                          setSuggestedDestinations(prev => prev.filter(p => p.id !== s.id));
-                          await replenishWithSimilar(s);
-                        }}
-                      >
-                              <div className="flex items-center gap-2 h-full">
-                                <img 
-                                  src={s.photoUrl || 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=32&h=24&fit=crop&q=70'} 
-                                  alt={s.name} 
-                                  className="w-8 h-6 object-cover rounded flex-shrink-0" 
-                                />
-                                <div className="flex-1 min-w-0">
-                                  <div className="text-xs font-medium line-clamp-1 text-gray-800">{s.name}</div>
-                                  <div className="flex items-center gap-2">
-                                    {s.rating && (
-                                      <div className="flex items-center gap-1">
-                                        <span className="text-yellow-500 text-xs">★</span>
-                                        <span className="text-xs text-gray-600">{s.rating.toFixed(1)}</span>
-                                      </div>
-                                    )}
-                                    {s.priceLevel && (
-                                      <span className="text-xs text-gray-500">
-                                        {'$'.repeat(s.priceLevel)}
-                                      </span>
-                                    )}
+                          <div className="space-y-1 max-h-48 overflow-y-auto">
+                            {suggestedDestinations.map((s, index) => (
+                              <div
+                                key={`suggested-${s.id}-${index}`}
+                                title={s.name}
+                                className="border border-gray-200 rounded-md bg-white shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer p-2 h-12"
+                                onMouseEnter={() => setHoveredPlace(s.id)}
+                                onMouseLeave={() => setHoveredPlace(null)}
+                                onClick={async () => {
+                                  addDestination(s);
+                                  setSuggestedDestinations(prev => prev.filter(p => p.id !== s.id));
+                                  await replenishWithSimilar(s);
+                                }}
+                              >
+                                <div className="flex items-center gap-2 h-full">
+                                  <img
+                                    src={s.photoUrl || 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=32&h=24&fit=crop&q=70'}
+                                    alt={s.name}
+                                    className="w-8 h-6 object-cover rounded flex-shrink-0"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-xs font-medium line-clamp-1 text-gray-800">{s.name}</div>
+                                    <div className="flex items-center gap-2">
+                                      {s.rating && (
+                                        <div className="flex items-center gap-1">
+                                          <span className="text-yellow-500 text-xs">★</span>
+                                          <span className="text-xs text-gray-600">{s.rating.toFixed(1)}</span>
+                                        </div>
+                                      )}
+                                      {s.priceLevel && (
+                                        <span className="text-xs text-gray-500">
+                                          {'$'.repeat(s.priceLevel)}
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
+                                  <Plus className="w-3 h-3 text-purple-600 flex-shrink-0" />
                                 </div>
-                                <Plus className="w-3 h-3 text-purple-600 flex-shrink-0" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                              </div>
+                            ))}
+                          </div>
                         ) : (
                           <div className="text-center py-4 text-gray-500 text-xs">
                             No suggestions available
                           </div>
                         )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-          </div>
-        </div>
 
                 {/* Right Column - Map */}
-                <div className="col-span-3 pl-4">
-                  <div className="h-[400px] w-full border border-blue-300 rounded-lg overflow-hidden ml-4">
-            {initialLoading ? (
-              <div className="h-full flex items-center justify-center bg-gray-50">
-                <div className="text-center">
-                  <Loader2 className="w-8 h-8 text-purple-600 mx-auto mb-2 animate-spin" />
-                  <p className="text-xs text-gray-500">Loading destinations...</p>
-                </div>
-              </div>
-            ) : mapsApiKey && allPins.length > 0 ? (
-              <MapEmbed 
-                apiKey={mapsApiKey} 
-                pins={allPins} 
-                className="w-full h-full" 
-                onHover={setHoveredPlace}
-                selectedPins={selectedDestinations.map(d => d.id)}
+                <div className="col-span-2 pr-4">
+                  <div className="h-full w-full border rounded-lg overflow-hidden ml-4">
+                    {initialLoading ? (
+                      <div className="h-full flex items-center justify-center bg-gray-50">
+                        <div className="text-center">
+                          <Loader2 className="w-8 h-8 text-purple-600 mx-auto mb-2 animate-spin" />
+                          <p className="text-xs text-gray-500">Loading destinations...</p>
+                        </div>
+                      </div>
+                    ) : mapsApiKey && allPins.length > 0 ? (
+                      <MapEmbed
+                        apiKey={mapsApiKey}
+                        pins={allPins}
+                        className="w-full h-full"
+                        onHover={setHoveredPlace}
+                        selectedPins={selectedDestinations.map(d => d.id)}
                         autoZoom={true}
                         smoothAnimations={true}
-              />
-            ) : (
-              <div className="h-full flex items-center justify-center bg-gray-50">
-                <div className="text-center">
+                      />
+                    ) : (
+                      <div className="h-full flex items-center justify-center bg-gray-50">
+                        <div className="text-center">
                           <MapPin className="w-8 h-8 text-gray-400 mx-auto mb-2" />
                           <p className="text-xs text-gray-500">Select destinations to view on map</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            )}
-          </div>
-        </div>
-      </div>
 
               {/* Bottom Section - Route Options & Generate Button */}
               <div className="mt-4 pt-3 border-t border-gray-200">
-        <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between">
                   {/* Route Options */}
                   <div className="flex items-center gap-6">
                     <label className="flex items-center space-x-2 cursor-pointer">
-                      <input 
-                        type="radio" 
-                        name="routeOption" 
-                        value="suggest" 
+                      <input
+                        type="radio"
+                        name="routeOption"
+                        value="suggest"
                         defaultChecked
                         className="w-3 h-3 text-purple-600 border-gray-300 focus:ring-purple-500"
                       />
                       <span className="text-xs text-gray-700">Suggest the best possible route</span>
                     </label>
                     <label className="flex items-center space-x-2 cursor-pointer">
-                      <input 
-                        type="radio" 
-                        name="routeOption" 
-                        value="manual" 
+                      <input
+                        type="radio"
+                        name="routeOption"
+                        value="manual"
                         className="w-3 h-3 text-purple-600 border-gray-300 focus:ring-purple-500"
                       />
                       <span className="text-xs text-gray-700">I'll choose the order</span>
                     </label>
-          </div>
-          
+                  </div>
+
                   {/* Generate Trip Button */}
-                  <Button 
+                  <Button
                     onClick={handleGenerateTrip}
                     disabled={initialLoading || selectedDestinations.length === 0}
                     className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white px-6 py-2 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
@@ -676,28 +673,27 @@ const Destinations: React.FC<DestinationsProps> = ({ tripData: propTripData, onC
                     ) : (
                       `Generate Trip with ${selectedDestinations.length} Destinations`
                     )}
-            </Button>
-          </div>
+                  </Button>
+                </div>
 
                 {/* Bottom Action Buttons */}
                 <div className="flex items-center justify-start mt-2 gap-3">
                   <button className="p-1 hover:bg-gray-100 rounded-lg">
                     <ThumbsUp className="w-3 h-3 text-gray-500" />
-            </button>
+                  </button>
                   <button className="p-1 hover:bg-gray-100 rounded-lg">
                     <ThumbsDown className="w-3 h-3 text-gray-500" />
-            </button>
+                  </button>
                   <button className="p-1 hover:bg-gray-100 rounded-lg">
                     <RotateCcw className="w-3 h-3 text-gray-500" />
-            </button>
-                  <span className="text-xs text-gray-500">Undo</span>
-        </div>
-      </div>
+                  </button>
+                </div>
+              </div>
             </div>
           </Card>
         </div>
-          </div>
-          
+      </div>
+
     </div>
   );
 };

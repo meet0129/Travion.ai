@@ -8,7 +8,7 @@ import MyTrips from "@/components/MyTrips";
 import { v4 as uuidv4 } from "uuid";
 import { geminiService } from "@/lib/gemini";
 import { useTrips } from "@/contexts/TripsContext";
-import logo from "@/assets/travion_logo.png";
+import logo from "@/assets/travion_logo2.0.png";
 
 const Sidebar = () => {
   const [isCollapsed, setIsCollapsed] = useState(true);
@@ -145,7 +145,7 @@ const Sidebar = () => {
               className="w-12 h-12 p-0"
               onClick={() => setIsCollapsed(false)}
             >
-              <img src={logo} alt="Travion logo" className="w-10 h-10 rounded-lg object-contain hover:scale-105 transition-transform duration-200" />
+              <img src={logo} alt="Travion logo" className="w-8 h-8 flex justify-center items-center rounded-full object-contain hover:scale-105 transition-transform duration-200" />
             </Button>
           </div>
 

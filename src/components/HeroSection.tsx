@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import logo from "@/assets/travion_logo.png";
+import logo from "@/assets/travion_logo2.0.png";
 import { ArrowRight, ChevronDown, MapPin, Calendar, Users, Star } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
