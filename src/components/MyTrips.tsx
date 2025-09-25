@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
 import { geminiService } from "@/lib/gemini";
 import { firebaseChatService } from "@/lib/firebaseService";
+import logo from "@/assets/travion_logo2.0.png";
 
 interface MyTripsProps {
   isOpen: boolean;
@@ -136,9 +137,7 @@ const MyTrips: React.FC<MyTripsProps> = ({ isOpen, onClose }) => {
                   }
                 }}
               >
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center flex-shrink-0">
-                  <span className="text-white text-xs font-bold">✈️</span>
-                </div>
+                <img src={logo} alt="Travion logo" className="w-8 h-8 flex justify-center items-center rounded-full object-contain hover:scale-105 transition-transform duration-200" />
                 <div className="flex-1 min-w-0">
                   <h3 className="font-medium text-foreground text-sm leading-tight line-clamp-1">
                     {trip.title}
@@ -172,7 +171,7 @@ const MyTrips: React.FC<MyTripsProps> = ({ isOpen, onClose }) => {
           {trips.length === 0 && (
             <div className="text-center py-8">
               <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl">✈️</span>
+                <span className="text-3xl">✈️</span>
               </div>
               <p className="text-muted-foreground text-sm">No trips yet</p>
               <p className="text-muted-foreground text-xs mt-1">
