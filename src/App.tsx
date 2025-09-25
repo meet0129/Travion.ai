@@ -9,8 +9,6 @@ import { TripsProvider } from "@/contexts/TripsContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Chat from "./pages/Chat";
-import Preferences from "./pages/Preferences";
-import Destinations from "./pages/Destinations";
 import Profile from "./pages/Profile";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
@@ -44,16 +42,6 @@ const App = () => (
               <Route path="/chat/:chatId" element={
                 <ProtectedRoute>
                   <Chat />
-                </ProtectedRoute>
-              } />
-              <Route path="/preferences" element={
-                <ProtectedRoute>
-                  <Preferences />
-                </ProtectedRoute>
-              } />
-              <Route path="/destinations" element={
-                <ProtectedRoute>
-                  <Destinations />
                 </ProtectedRoute>
               } />
               <Route path="/profile" element={

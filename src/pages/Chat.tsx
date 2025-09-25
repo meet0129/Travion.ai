@@ -4,18 +4,17 @@ import { v4 as uuidv4 } from "uuid";
 import {
   AlertCircle,
   Bot,
-  User as UserIcon,
   ThumbsUp,
   ThumbsDown,
   RotateCcw,
-  Send,
   Edit2,
   Check,
   X,
+  ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import userAvatar from "../assets/default-avatar.svg";
+import logo from "@/assets/travion_logo2.0.png";
 import Sidebar from "../components/Sidebar";
 import {
   initializeGemini,
@@ -26,6 +25,8 @@ import PreferencesWidget from "../components/PreferencesWidget";
 import PreferencesFolded from "../components/PreferencesFolded";
 import Destinations from "../pages/Destinations";
 import { useTrips } from "../contexts/TripsContext";
+import { useAuth } from "@/contexts/AuthContext";
+
 import { firebaseChatService } from "../lib/firebaseService";
 
 // Trip Confirmation Dialog Component with Inline Editing
@@ -173,6 +174,7 @@ const Chat = () => {
   const navigate = useNavigate();
   const { chatId } = useParams();
   const { saveTrip } = useTrips();
+  const { currentUser } = useAuth();
   const [messages, setMessages] = useState([]);
   const [currentChatId, setCurrentChatId] = useState(chatId || uuidv4());
 
@@ -299,6 +301,9 @@ const Chat = () => {
   const [showSummaryConfirmation, setShowSummaryConfirmation] = useState(false);
   const [selectedPreferences, setSelectedPreferences] = useState([]);
   const messagesEndRef = useRef(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const composerRef = useRef<HTMLDivElement | null>(null);
+  const [isComposerActive, setIsComposerActive] = useState(false);
 
   // Persist UI state
   useEffect(() => {
@@ -388,20 +393,70 @@ const Chat = () => {
             if (persistedMessages) {
               setMessages(JSON.parse(persistedMessages));
             } else {
-              // Check for initial trip description and create contextual greeting
+              // If coming from hero submit, we'll auto-send the prompt; otherwise show default greeting
               const initialDescription = localStorage.getItem('initialTripDescription');
-              let greeting;
-              
-              if (initialDescription) {
-                greeting = `Great! I see you're interested in: "${initialDescription}"\n\nLet me ask you a few quick questions to plan your perfect trip! 🌟\n\nFirst, which specific destination in India are you most excited about?`;
-                localStorage.removeItem('initialTripDescription');
+              if (!initialDescription) {
+                const greeting = geminiService.getInitialGreeting();
+                setMessages([
+                  { type: "ai", content: greeting, timestamp: new Date() },
+                ]);
               } else {
-                greeting = geminiService.getInitialGreeting();
+                // Show AI greeting first, then send the user's initial prompt as reply
+                const greeting = geminiService.getInitialGreeting();
+                const initial = initialDescription;
+                localStorage.removeItem('initialTripDescription');
+                const aiGreeting = { type: "ai", content: greeting, timestamp: new Date() };
+                setMessages([aiGreeting]);
+                try {
+                  const messagesKey = `messages_${currentChatId}`;
+                  sessionStorage.setItem(messagesKey, JSON.stringify([aiGreeting]));
+                } catch {}
+
+                setTimeout(async () => {
+                  const firstUser = {
+                    type: "user",
+                    content: initial,
+                    timestamp: new Date(),
+                  };
+                  const msgsAfterUser = [aiGreeting, firstUser];
+                  setMessages(msgsAfterUser);
+                  try {
+                    const messagesKey = `messages_${currentChatId}`;
+                    sessionStorage.setItem(messagesKey, JSON.stringify(msgsAfterUser));
+                  } catch {}
+                  setHasUserInteracted(true);
+
+                  try {
+                    const aiResponse = await processMessage(initial);
+                    const finalMessages = [
+                      aiGreeting,
+                      firstUser,
+                      { type: "ai", content: aiResponse, timestamp: new Date() },
+                    ];
+                    setMessages(finalMessages);
+                    try {
+                      const messagesKey = `messages_${currentChatId}`;
+                      sessionStorage.setItem(messagesKey, JSON.stringify(finalMessages));
+                    } catch {}
+                  } catch (e) {
+                    const fallbackMessages = [
+                      aiGreeting,
+                      firstUser,
+                      {
+                        type: "ai",
+                        content:
+                          "Oops! Something went wrong on my end. Mind giving that another shot? 🔄",
+                        timestamp: new Date(),
+                      },
+                    ];
+                    setMessages(fallbackMessages);
+                    try {
+                      const messagesKey = `messages_${currentChatId}`;
+                      sessionStorage.setItem(messagesKey, JSON.stringify(fallbackMessages));
+                    } catch {}
+                  }
+                }, 150);
               }
-              
-              setMessages([
-                { type: "ai", content: greeting, timestamp: new Date() },
-              ]);
             }
           } catch {}
 
@@ -423,6 +478,33 @@ const Chat = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Auto-resize textarea height based on content
+  const autoResizeTextarea = () => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const maxHeightPx = 160; // cap growth to avoid covering screen
+    el.style.height = '22px';
+    const newHeight = Math.min(el.scrollHeight, maxHeightPx);
+    el.style.height = `${newHeight}px`;
+    el.style.overflowY = el.scrollHeight > maxHeightPx ? 'auto' : 'hidden';
+  };
+
+  useEffect(() => {
+    autoResizeTextarea();
+  }, [newMessage]);
+
+  // Show border only when focused; hide when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (!composerRef.current) return;
+      if (!composerRef.current.contains(e.target as Node)) {
+        setIsComposerActive(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Extract trip information from message
   const extractTripInfo = (message, currentContext) => {
@@ -1029,13 +1111,14 @@ Your detailed travel plan will be ready in just a moment... 🌟`,
           </div>
         )}
 
-        <div className="space-y-8 mb-28">
+        <div className="space-y-8 mb-36">
           {messages.map((message, index) => (
             <div key={index} className={`flex items-start gap-3`}>
               {message.type === "ai" ? (
                 <div className="flex items-start gap-3 max-w-[92%]">
                   <div className="h-8 w-8 rounded-full bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center flex-shrink-0">
-                    <Bot className="h-4 w-4 text-violet-600 dark:text-violet-300" />
+                    {/* <Bot className="h-4 w-4 text-violet-600 dark:text-violet-300" /> */}
+                    <img src={logo} alt="Travion logo" className="w-6 h-6 rounded-lg object-contain text-violet-600 dark:text-violet-300" />
                   </div>
                   <div className="flex-1">
                     <div className="text-xs font-semibold text-violet-700 dark:text-violet-300 mb-1">
@@ -1043,7 +1126,7 @@ Your detailed travel plan will be ready in just a moment... 🌟`,
                     </div>
                     <div className="rounded-none border-0 bg-transparent p-0">
                       <div className="prose dark:prose-invert max-w-none">
-                        <div
+                        <div className="font-[Sans-Serif] text-[14px] leading-[20px]"
                           dangerouslySetInnerHTML={{
                             __html: message.content.replace(/\n/g, "<br>"),
                           }}
@@ -1080,7 +1163,7 @@ Your detailed travel plan will be ready in just a moment... 🌟`,
               ) : (
                 <div className="flex items-start gap-3 max-w-[92%]">
                   <img
-                    src={userAvatar}
+                    src={currentUser?.photoURL}
                     alt="You"
                     className="h-8 w-8 rounded-full border border-slate-200 dark:border-slate-800 flex-shrink-0"
                   />
@@ -1089,7 +1172,7 @@ Your detailed travel plan will be ready in just a moment... 🌟`,
                       You
                     </div>
                     <div className="p-0">
-                      <div className="whitespace-pre-wrap text-slate-900 dark:text-slate-100">
+                      <div className="font-[Sans-Serif] text-[14px] leading-[20px] whitespace-pre-wrap text-slate-900 dark:text-slate-100">
                         {message.content}
                       </div>
                     </div>
@@ -1169,23 +1252,41 @@ Your detailed travel plan will be ready in just a moment... 🌟`,
           <div ref={messagesEndRef} />
         </div>
 
-        <div className="sticky bottom-0 bg-gradient-to-t from-slate-50 via-slate-50/95 to-transparent dark:from-slate-900 dark:via-slate-900/95 pt-4">
-          <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-lg rounded-2xl shadow-xl overflow-hidden border border-slate-200/50 dark:border-slate-700/50">
-            <div className="flex items-end gap-2 p-4">
+        <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white/90 to-transparent dark:from-slate-950 dark:via-slate-950/95 py-4">
+          <div className="max-w-3xl mx-auto px-4">
+            <div
+              ref={composerRef}
+              onClick={() => textareaRef.current?.focus()}
+              className={`relative flex items-center transition-all duration-200 rounded-3xl bg-white dark:bg-slate-900 ${
+                isComposerActive
+                  ? 'border border-violet-400 shadow-[0_8px_30px_rgba(167,139,250,0.20)]'
+                  : 'border border-slate-200 shadow-[0_6px_24px_rgba(0,0,0,0.06)]'
+              }`}
+              style={{ minHeight: "46px" }}
+            >
+              <img src={logo} alt="Travion" className="absolute left-3 top-1/2 -translate-y-1/2 w-6 h-6 inline-flex items-center justify-center rounded-full transition-all object-contain" />
               <textarea
+                ref={textareaRef}
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
+                onInput={autoResizeTextarea}
                 onKeyPress={handleKeyPress}
-                placeholder="Type your message..."
-                className="flex-1 bg-transparent border-0 focus:ring-0 resize-none h-10 max-h-40 overflow-auto"
-                style={{ height: "40px" }}
+                onFocus={() => setIsComposerActive(true)}
+                placeholder="Ask Travion..."
+                className="composer-textarea bg-transparent border-0 focus:outline-none focus:ring-0 resize-none min-h-[20px] max-h-48 overflow-auto text-[13px] leading-[20px] text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:placeholder-transparent transition-colors py-3 pl-12 pr-4 font-normal"
+                style={{ width: 'calc(100% - 64px)' }}
               />
               <button
                 onClick={handleSendMessage}
                 disabled={!newMessage.trim() || !isGeminiInitialized}
-                className="bg-blue-500 text-white px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-600 transition-colors"
+                className={`absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 inline-flex items-center justify-center rounded-full transition-all z-10 ${
+                  !newMessage.trim() || !isGeminiInitialized
+                    ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                    : "bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white shadow-sm hover:brightness-105"
+                }`}
+                aria-label="Send"
               >
-                Send
+                <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           </div>
